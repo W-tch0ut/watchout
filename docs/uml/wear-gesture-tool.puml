@@ -1,0 +1,88 @@
+' 워치 제스처 툴 (:wear 모듈) — 클래스 구조와 인식·녹화 흐름
+@startuml
+skinparam classAttributeIconSize 0
+
+package "com.watchout.wear" {
+    class MainActivity {
+        + onCreate(savedInstanceState: Bundle?): Unit
+    }
+
+    class GestureToolViewModel {
+        - streamer: SensorStreamer
+        - store: RecordingStore
+        - recognizer: RuleBasedGestureRecognizer
+        + hand: WearingHand
+        + lastResult: GestureResult?
+        + history: List<GestureResult>
+        + recordPhase: RecordPhase
+        + counts: Map<Gesture, Int>
+        + toggleHand(): Unit
+        + startRecognizing(): Unit
+        + stopRecognizing(): Unit
+        + enterRecordScreen(): Unit
+        + leaveRecordScreen(): Unit
+        + record(label: Gesture): Unit
+        + deleteLatest(label: Gesture): Unit
+        - onGestureRecognized(result: GestureResult): Unit
+    }
+
+    class SensorStreamer {
+        - sensorManager: SensorManager
+        - latestGyro: FloatArray
+        + isAvailable: Boolean
+        + start(onSample: (SensorSample) -> Unit): Boolean
+        + stop(): Unit
+        + onSensorChanged(event: SensorEvent): Unit
+    }
+
+    class RecordingStore {
+        + directory: File
+        + save(recording: GestureRecording): File
+        + counts(): Map<Gesture, Int>
+        + deleteLatest(label: Gesture): Boolean
+    }
+
+    interface RecordPhase <<sealed>>
+}
+
+package "com.watchout.gesture (:gesture)" {
+    interface GestureRecognizer
+    class RuleBasedGestureRecognizer
+    class GestureRecording
+}
+
+MainActivity --> GestureToolViewModel
+GestureToolViewModel *-- SensorStreamer
+GestureToolViewModel *-- RecordingStore
+GestureToolViewModel *-- RuleBasedGestureRecognizer
+GestureToolViewModel --> RecordPhase
+GestureRecognizer <|.. RuleBasedGestureRecognizer
+RecordingStore --> GestureRecording
+@enduml
+
+@startuml
+title 실시간 인식 흐름
+actor 사용자
+participant "RecognizeScreen" as UI
+participant GestureToolViewModel as VM
+participant SensorStreamer as S
+participant RuleBasedGestureRecognizer as R
+
+사용자 -> UI : 실시간 인식 화면 열기
+UI -> VM : startRecognizing()
+VM -> S : start(onSample)
+loop 50Hz
+    S -> VM : SensorSample
+    VM -> R : onSample(sample)
+    alt 동작 하나가 끝남
+        R --> VM : GestureResult
+        VM -> VM : onGestureRecognized()\n화면 갱신 + 진동
+        note right : 다음 단계(#42): 여기서 MQTT 전송
+    else 아직 동작 중 / 가만히 있음
+        R --> VM : null
+    end
+end
+사용자 -> UI : 밀어서 나가기
+UI -> VM : stopRecognizing()
+VM -> S : stop()
+@enduml
