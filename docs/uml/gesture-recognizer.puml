@@ -1,0 +1,136 @@
+' 제스처 인식 로직 (:gesture 모듈, 순수 Kotlin)
+' 센서 값 → 동작 구간 자르기 → 특징값 → 규칙 판단 → 결과
+@startuml
+skinparam classAttributeIconSize 0
+
+class SensorSample <<data>> {
+    + timestampMs: Long
+    + ax: Float
+    + ay: Float
+    + az: Float
+    + gx: Float
+    + gy: Float
+    + gz: Float
+    + normalizedFor(hand: WearingHand): SensorSample
+}
+
+enum WearingHand {
+    LEFT
+    RIGHT
+}
+
+enum Gesture {
+    ROTATE_CW
+    ROTATE_CCW
+    PUSH
+    PULL
+    SWING_LEFT
+    SWING_RIGHT
+    PRESS_DOWN
+    IDLE
+    --
+    + id: String
+    + label: String
+    + howTo: String
+    + {static} fromId(id: String): Gesture
+}
+
+interface GestureRecognizer {
+    + onSample(sample: SensorSample): GestureResult?
+    + reset(): Unit
+}
+
+class RuleBasedGestureRecognizer {
+    + hand: WearingHand
+    - config: RuleConfig
+    - segmenter: MotionSegmenter
+    + onSample(sample: SensorSample): GestureResult?
+    + reset(): Unit
+    + classify(frames: List<MotionFrame>): GestureResult
+    - decide(f: GestureFeatures): Pair<Gesture, Float>
+    + {static} extractFeatures(frames: List<MotionFrame>, lobeStartGyro: Float): GestureFeatures
+    + {static} firstLobeIntegral(times: List<Long>, values: List<Float>, startThreshold: Float): Float
+}
+
+class TFLiteGestureRecognizer <<다음 단계 #44>> {
+    - interpreter: Interpreter
+    + onSample(sample: SensorSample): GestureResult?
+    + reset(): Unit
+}
+
+class MotionSegmenter {
+    - config: SegmenterConfig
+    - gravity: FloatArray?
+    - preRoll: ArrayDeque<MotionFrame>
+    - active: ArrayList<MotionFrame>
+    + onSample(sample: SensorSample): List<MotionFrame>?
+    + reset(): Unit
+}
+
+class MotionFrame <<data>> {
+    + timestampMs: Long
+    + lx: Float
+    + ly: Float
+    + lz: Float
+    + gx: Float
+    + gy: Float
+    + gz: Float
+    + linearMagnitude: Float
+    + gyroMagnitude: Float
+}
+
+class SegmenterConfig <<data>> {
+    + startGyro: Float
+    + startLinear: Float
+    + quietGyro: Float
+    + quietLinear: Float
+    + quietHoldMs: Long
+    + minDurationMs: Long
+    + maxDurationMs: Long
+    + cooldownMs: Long
+}
+
+class RuleConfig <<data>> {
+    + rotateMinRad: Float
+    + translateMinPeak: Float
+    + minConfidence: Float
+}
+
+class GestureResult <<data>> {
+    + gesture: Gesture
+    + confidence: Float
+    + startMs: Long
+    + endMs: Long
+    + features: GestureFeatures
+}
+
+class GestureFeatures <<data>> {
+    + durationMs: Long
+    + rotation: Vec3
+    + linearPeak: Vec3
+    + linearFirstSign: Vec3
+}
+
+class GestureRecording <<data>> {
+    + label: Gesture
+    + hand: WearingHand
+    + startedAtEpochMs: Long
+    + samples: List<SensorSample>
+    + toCsv(): String
+    + fileName(): String
+    + {static} labelFromFileName(name: String): Gesture?
+}
+
+GestureRecognizer <|.. RuleBasedGestureRecognizer
+GestureRecognizer <|.. TFLiteGestureRecognizer
+RuleBasedGestureRecognizer *-- MotionSegmenter
+RuleBasedGestureRecognizer *-- RuleConfig
+MotionSegmenter *-- SegmenterConfig
+MotionSegmenter --> MotionFrame
+RuleBasedGestureRecognizer --> GestureResult
+GestureResult *-- GestureFeatures
+GestureResult --> Gesture
+SensorSample --> WearingHand
+GestureRecording o-- SensorSample
+GestureRecording --> Gesture
+@enduml
