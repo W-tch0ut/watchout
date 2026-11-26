@@ -44,6 +44,44 @@
 - 전화 받기/거절, 뒤로 가기 같은 시스템 동작은 Android 접근성 서비스 등 특별한 권한이 필요하다.
 - 볼륨·미디어 제어처럼 일반 권한으로 되는 동작부터 구현하고, 시스템 동작은 이후에 확장한다.
 
+## 설계 문서화 (UML)
+구현한 구조는 **PlantUML**로 `docs/uml/`에 정리한다. 코드와 설계 그림이 항상 같이 움직이도록 한다.
+
+- **언제:** 클래스·모듈을 새로 만들거나, 클래스/메서드/관계를 바꾸면 **같은 PR 안에서** 다이어그램을 작성·갱신한다.
+- **위치·이름:** `docs/uml/<모듈명>.puml` (영문 소문자 + 하이픈)
+  - 예) `docs/uml/preprocessing.puml`, `docs/uml/gesture-recognizer.puml`, `docs/uml/action-executor.puml`
+- **종류:**
+  - 클래스 구조 → 클래스 다이어그램
+  - 처리 흐름(센서 → 상황 판단 → 인식 → 위험도 처리 → 실행) → 시퀀스 또는 액티비티 다이어그램
+- **표기법:**
+  - 파일은 `@startuml` / `@enduml`로 감싼다.
+  - 접근 제어자: `+` public, `-` private, `#` protected
+  - 추상: `abstract class`, 추상 메서드는 `{abstract}`
+  - 관계: `<|--` 상속, `<|..` 인터페이스 구현, `*--` 합성, `o--` 집합, `-->` 의존
+  - 속성·메서드에 타입을 적는다. 예) `- windowSize: Int`, `+ predict(window: FloatArray): GestureResult`
+- **기준:** 코드와 다이어그램이 다르면 **코드가 기준**이다. 다이어그램을 코드에 맞춰 고친다.
+- **보기:** GitHub는 PlantUML을 그림으로 보여주지 않는다. VS Code의 PlantUML 확장으로 미리 보고, README나 발표에 쓸 그림은 PNG/SVG로 내보내 `docs/uml/img/`에 둔다.
+
+```plantuml
+' 예시: docs/uml/gesture-recognizer.puml
+@startuml
+interface GestureRecognizer {
+    + predict(window: FloatArray): GestureResult
+}
+class TFLiteGestureRecognizer {
+    - interpreter: Interpreter
+    - threshold: Float
+    + predict(window: FloatArray): GestureResult
+}
+class GestureResult {
+    + gestureId: String
+    + confidence: Float
+}
+GestureRecognizer <|.. TFLiteGestureRecognizer
+TFLiteGestureRecognizer --> GestureResult
+@enduml
+```
+
 ## 브랜치 전략
 ```
 main        ← 항상 실행 가능한 안정 버전 (직접 push 금지, PR로만 merge)
@@ -85,11 +123,13 @@ git push -u origin feature/#12-gesture-register
 ## Pull Request
 - 제목: `[타입] 내용` 예) `[feat] 제스처 등록 화면`
 - 본문에 무엇을 왜 바꿨는지 쓰고, `Closes #이슈번호`를 넣는다.
+- 구조를 바꾼 PR은 본문에 갱신한 다이어그램 파일(`docs/uml/...puml`)을 적는다.
 - 최소 1명의 승인(Approve) 후 merge한다. merge한 브랜치는 삭제한다.
 
 ## Claude 작업 규칙
 - 답변과 설명은 한국어로 한다.
 - 작성하거나 수정한 코드는 무엇을 왜 그렇게 했는지 자세히 설명한다.
+- 클래스·모듈을 구현하거나 구조를 바꾸면, "설계 문서화 (UML)" 규칙에 따라 해당 `.puml` 파일도 함께 작성·수정하고 다이어그램 내용을 설명한다.
 - 작업 전에 지금 브랜치가 `main`/`dev`가 아닌 작업 브랜치인지 확인한다. 아니면 위 규칙대로 브랜치를 만들자고 제안한다.
 - 커밋과 push는 사용자가 요청할 때만 하며, 위 커밋 메시지 규칙을 따른다.
 - 다른 팀원 담당 영역의 파일을 크게 고쳐야 하면, 먼저 사용자에게 알리고 이슈/Discord로 공유하도록 권한다.
