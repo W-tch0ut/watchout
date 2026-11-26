@@ -4,20 +4,35 @@
 프로젝트 소개(문제 정의, 유즈케이스, 설계)는 [README.md](README.md)를 본다.
 
 ## 프로젝트 요약
-- 가속도·자이로 센서 기반 개인 맞춤형 제스처 컨트롤 앱. 핵심 목표는 **"사용자가 만든 제스처도 일상 동작과 헷갈리지 않게 하는 것"**(커스텀 제스처의 오인식 방지)이다.
+- **환자 곁을 지키는 반려 로봇카.** 평소에는 스마트워치 제스처로 로봇카와 놀고, 사용자가 쓰러지면 상태를 확인해 가족·119에 알린다. 핵심은 **"평소엔 친구, 위급할 땐 구조자"**이고, 워치와 카메라로 **두 번 확인해서 오알림을 줄이는 것**이다.
 - 핵심 요구사항:
-  - **등록 단계 품질 검사**: 새 제스처를 사용자의 평소 움직임과 비교해, 일상 동작과 비슷하면 경고한다.
-  - **상황별 활성화**: 제스처는 설정된 상황(전화 수신, 음악 재생 등)에서만 인식한다.
-  - **신뢰도 기준**: 인식 신뢰도가 기준치 미만이면 실행하지 않는다.
-  - **위험도별 처리**: 가벼운 기능(손전등, 음악)은 즉시 실행, 중요한 기능(전화, 메시지)은 진동 확인 후 실행한다.
-  - **자연스러운 피드백 학습**: 실행 후 3초 안에 취소되면 오인식으로 보고 자동 학습한다.
-  - **기기 안에서 학습**: 센서 원본 데이터는 기기 밖으로 보내지 않는다. 서버에는 제스처 설정만 암호화해 저장한다.
-- 범위 밖: "어떤 기기에서도 그대로 사용"(기기 간 센서 차이로 제외). 관련 기능을 제안하지 않는다.
+  - **제스처 조종**: 워치 제스처(가속도·자이로)로 로봇카를 부르고 움직인다.
+  - **이중 확인 쓰러짐 감지**: 워치 충격 감지 → 로봇카가 다가감 → 카메라로 쓰러짐 확인. **둘 다 맞을 때만** 응급 상황으로 판단한다.
+  - **괜찮아요 취소**: 충격 직후 워치가 진동으로 묻고, **10초 안에 취소하면** 알림을 보내지 않는다.
+  - **응급 연락**: 가족에게 알림 + 상태 정보(사진, 움직임 여부)를 보내고, 119에 연락한다(시뮬레이션).
+  - **로봇팔 도움**: 카메라로 물건을 찾아 로봇팔로 집어 가져다준다.
+  - **영상 보호**: 카메라 영상은 로봇카 안에서만 분석한다. 응급 상황에서만 가족에게 사진을 보낸다.
+- 하드웨어: 로봇카·로봇팔은 **이미 조립된 상태**다. 조립·부품 구매는 범위가 아니다.
+- 범위 밖 (관련 기능을 제안하지 않는다):
+  - **실제 119 자동 신고**: 데모에서는 화면·문자 시뮬레이션으로만 처리한다. 코드에서 실제 119로 전화·문자를 보내지 않는다.
+  - **의료 진단**: 병명이나 원인을 판단하지 않는다. 쓰러짐 여부와 움직임 유무만 다룬다.
+  - **여러 방·계단 이동**: 로봇카는 한 공간 안에서만 움직인다.
+
+## 역할과 담당 영역
+| 팀 | 담당 | 영역 |
+|---|---|---|
+| 🔧 HW — 로봇카 | 최소리 | 주행 제어, 사용자에게 다가가기, 장애물 정지, 카메라 영상 받기 |
+| 🔧 HW — 로봇팔 | 조성완 | 로봇팔 집기·놓기, 위치 보정, 물건 위치 찾기 |
+| 💻 SW | 구주영, 김은진 | 워치 앱·제스처·충격 감지, 쓰러짐 판단 AI, 워치↔차 통신, 서버·응급 알림, 보호자 앱 |
+
+- HW와 SW는 **명령 메시지**(예: `{"cmd": "approach"}`, `{"cmd": "grab", "target": "phone"}`)로 만난다. 메시지 형식이 정해지면 이 문서에 기록하고, 모든 코드는 이 형식을 따른다.
 
 ## 기술 스택 (안)
-- 앱: Wear OS, Kotlin
-- AI: Python, TensorFlow → TensorFlow Lite (온디바이스 추론·학습)
-- 서버/DB: Firebase (Authentication, Firestore — 제스처 설정 암호화 저장)
+- 워치: Wear OS, Kotlin / 제스처 인식 TensorFlow Lite
+- 로봇카·로봇팔: 조립 완료된 로봇카·로봇팔 + 카메라, 제어 코드는 Python
+- 비전 AI: MediaPipe Pose 또는 YOLO-Pose (쓰러짐 판단), OpenCV
+- 통신: 워치 ↔ 로봇카 BLE 또는 Wi-Fi(MQTT)
+- 서버: Firebase (Authentication, Firestore, Cloud Messaging 알림)
 
 ## 개발 환경
 | 항목 | 버전 |
@@ -26,34 +41,38 @@
 | Kotlin | (예: 2.0) |
 | Python | (예: 3.11) |
 | TensorFlow | (예: 2.16) |
+| OpenCV / MediaPipe | (예: 4.10 / 0.10) |
 
 - Python 버전은 `.python-version` 파일이 기준이다 (CI도 이 파일을 읽는다).
 - Python 의존성은 `requirements.txt`(실행용)와 `requirements-dev.txt`(lint·테스트 도구)에 **버전을 고정**해서 관리한다. 패키지를 추가하면 해당 파일도 함께 수정한다.
 
-## 센서 데이터 규칙
-- 6축 데이터: 가속도(ax, ay, az) + 자이로(gx, gy, gz)
-- 저장 형식, 컬럼 순서, 샘플링 주기, 파일 이름 규칙은 팀에서 정한 뒤 이 섹션에 기록하고, 모든 코드는 이 형식을 따른다.
-- 원본 데이터(`data/`)와 대용량 모델 파일은 **Git에 커밋하지 않는다**. 공유 드라이브에 두고, 리포에는 위치와 형식 설명만 남긴다.
+## 데이터 규칙
+- **워치 센서**: 6축 데이터, 가속도(ax, ay, az) + 자이로(gx, gy, gz)
+- **카메라**: 로봇카 카메라 영상·사진
+- 저장 형식, 컬럼 순서, 샘플링 주기, 파일 이름 규칙, 충격 감지·쓰러짐 판단 기준값은 팀에서 정한 뒤 이 섹션에 기록하고, 모든 코드는 이 값을 따른다.
+- 원본 데이터(`data/`), 영상·사진, 대용량 모델 파일은 **Git에 커밋하지 않는다**. 공유 드라이브에 두고, 리포에는 위치와 형식 설명만 남긴다.
 
-## 보안
+## 보안·개인정보
 - `google-services.json`, `.env`, API 키, 키스토어 파일은 **절대 커밋하지 않는다**. `.gitignore`에 포함되어 있는지 확인한다.
 - 코드에 키나 비밀번호를 직접 적지 않는다.
-- 움직임 데이터는 민감 정보다(입력 패턴, 본인 식별, 건강 상태 추정 가능). 앱 코드에서 **센서 원본 데이터를 서버나 로그로 보내지 않는다**.
-- 서버에 저장하는 제스처 설정은 암호화하고, 로그인 토큰은 안전한 저장소(Android Keystore 등)에 보관한다.
+- 카메라 영상과 움직임 데이터는 민감 정보다(얼굴, 집 안 모습, 건강 상태). **영상과 센서 원본 데이터를 서버나 로그로 보내지 않는다.** 영상은 로봇카 안에서만 분석한다.
+- 응급 상황이 확정됐을 때만 가족에게 사진과 상태 정보를 보낸다.
+- 보호자 연락처는 서버에 암호화해 저장하고, 로그인 토큰은 안전한 저장소(Android Keystore 등)에 보관한다.
 
-## 시스템 동작 구현 주의
-- 전화 받기/거절, 뒤로 가기 같은 시스템 동작은 Android 접근성 서비스 등 특별한 권한이 필요하다.
-- 볼륨·미디어 제어처럼 일반 권한으로 되는 동작부터 구현하고, 시스템 동작은 이후에 확장한다.
+## 하드웨어·응급 기능 구현 주의
+- **119는 실제로 연락하지 않는다.** 테스트와 데모에서는 시뮬레이션(화면 표시, 팀원 번호로 문자 등)만 쓴다.
+- 로봇카·로봇팔 코드는 **멈춤 명령을 항상 가장 먼저** 처리하고, 통신이 끊기면 스스로 멈추게 한다.
+- 모터·로봇팔 제어 로직(속도 제한, 각도 범위 등)은 실제 기기 없이도 테스트할 수 있게 하드웨어 접근 부분과 분리해서 작성한다.
 
 ## 설계 문서화 (UML)
 구현한 구조는 **PlantUML**로 `docs/uml/`에 정리한다. 코드와 설계 그림이 항상 같이 움직이도록 한다.
 
 - **언제:** 클래스·모듈을 새로 만들거나, 클래스/메서드/관계를 바꾸면 **같은 PR 안에서** 다이어그램을 작성·갱신한다.
 - **위치·이름:** `docs/uml/<모듈명>.puml` (영문 소문자 + 하이픈)
-  - 예) `docs/uml/preprocessing.puml`, `docs/uml/gesture-recognizer.puml`, `docs/uml/action-executor.puml`
+  - 예) `docs/uml/gesture-recognizer.puml`, `docs/uml/fall-detector.puml`, `docs/uml/car-controller.puml`
 - **종류:**
   - 클래스 구조 → 클래스 다이어그램
-  - 처리 흐름(센서 → 상황 판단 → 인식 → 위험도 처리 → 실행) → 시퀀스 또는 액티비티 다이어그램
+  - 처리 흐름(충격 감지 → 괜찮으세요? → 로봇카 이동 → 카메라 확인 → 응급 알림) → 시퀀스 또는 액티비티 다이어그램
 - **표기법:**
   - 파일은 `@startuml` / `@enduml`로 감싼다.
   - 접근 제어자: `+` public, `-` private, `#` protected
@@ -64,22 +83,23 @@
 - **보기:** GitHub는 PlantUML을 그림으로 보여주지 않는다. VS Code의 PlantUML 확장으로 미리 보고, README나 발표에 쓸 그림은 PNG/SVG로 내보내 `docs/uml/img/`에 둔다.
 
 ```plantuml
-' 예시: docs/uml/gesture-recognizer.puml
+' 예시: docs/uml/fall-detector.puml
 @startuml
-interface GestureRecognizer {
-    + predict(window: FloatArray): GestureResult
+interface FallDetector {
+    + detect(frame: ndarray): FallResult
 }
-class TFLiteGestureRecognizer {
-    - interpreter: Interpreter
-    - threshold: Float
-    + predict(window: FloatArray): GestureResult
+class PoseFallDetector {
+    - pose_model: PoseModel
+    - threshold: float
+    + detect(frame: ndarray): FallResult
 }
-class GestureResult {
-    + gestureId: String
-    + confidence: Float
+class FallResult {
+    + is_fallen: bool
+    + confidence: float
+    + is_moving: bool
 }
-GestureRecognizer <|.. TFLiteGestureRecognizer
-TFLiteGestureRecognizer --> GestureResult
+FallDetector <|.. PoseFallDetector
+PoseFallDetector --> FallResult
 @enduml
 ```
 
@@ -101,9 +121,9 @@ PR을 올리거나 `main`/`dev`에 push하면 GitHub Actions(`.github/workflows/
 ### 테스트 작성 규칙
 - 함수·클래스를 만들면 **같은 PR에서** 테스트를 함께 작성한다.
 - 테스트 파일은 코드 옆의 `tests/` 폴더에 `test_<모듈명>.py`로 만들고, 함수 이름은 `test_`로 시작한다.
-  - 예) `ai/preprocessing.py` → `ai/tests/test_preprocessing.py`
-- 특히 다음 로직은 반드시 테스트한다: 전처리(윈도우 분할·정규화), 신뢰도 기준 판단, 위험도별 실행 분기, 3초 취소 판정.
-- 테스트에 센서 원본 데이터 파일을 쓰지 않는다. 작은 가짜 데이터를 코드 안에서 만들어 쓴다.
+  - 예) `vision/fall_detector.py` → `vision/tests/test_fall_detector.py`
+- 특히 다음 로직은 반드시 테스트한다: 충격 감지 기준 판단, 10초 취소 판정, 이중 확인(워치 + 카메라) 판단, 명령 메시지 만들기·해석, 멈춤 명령 우선 처리.
+- 테스트에 센서 원본 데이터나 실제 영상·사진 파일을 쓰지 않는다. 센서 값, 자세 좌표 같은 작은 가짜 데이터를 코드 안에서 만들어 쓴다.
 
 ### Kotlin (앱)
 - Android 프로젝트가 생성되면 ktlint / Android Lint와 JUnit 테스트를 CI에 추가한다 (#30).
