@@ -14,3 +14,16 @@ google-services.json
 
 # 센서 원본 데이터 (공유 드라이브에서 관리)
 data/
+
+# Android / Gradle
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.kotlin/
+captures/
+*.apk
+*.aab
+*.jks
+*.keystore
