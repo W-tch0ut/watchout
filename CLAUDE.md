@@ -27,7 +27,8 @@
 | Python | (예: 3.11) |
 | TensorFlow | (예: 2.16) |
 
-- Python 의존성은 `requirements.txt`에 **버전을 고정**해서 관리한다. 패키지를 추가하면 이 파일도 함께 수정한다.
+- Python 버전은 `.python-version` 파일이 기준이다 (CI도 이 파일을 읽는다).
+- Python 의존성은 `requirements.txt`(실행용)와 `requirements-dev.txt`(lint·테스트 도구)에 **버전을 고정**해서 관리한다. 패키지를 추가하면 해당 파일도 함께 수정한다.
 
 ## 센서 데이터 규칙
 - 6축 데이터: 가속도(ax, ay, az) + 자이로(gx, gy, gz)
@@ -82,6 +83,31 @@ TFLiteGestureRecognizer --> GestureResult
 @enduml
 ```
 
+## 테스트와 정적 분석 (CI)
+PR을 올리거나 `main`/`dev`에 push하면 GitHub Actions(`.github/workflows/ci.yml`)가 자동으로 검사한다.
+**CI가 실패(❌)한 PR은 merge하지 않는다.**
+
+### Python
+| 검사 | 도구 | 로컬에서 실행 |
+|---|---|---|
+| Lint (버그 가능성, import 정렬 등) | ruff | `ruff check .` (자동 수정: `ruff check --fix .`) |
+| 포맷 | ruff format | `ruff format .` |
+| 단위 테스트 | pytest | `pytest` |
+
+- 설정은 `pyproject.toml`에 있다. 규칙을 바꾸려면 팀과 합의 후 이 파일을 수정한다.
+- 처음 한 번 도구 설치: `pip install -r requirements-dev.txt`
+- **PR을 올리기 전에** 위 세 명령을 로컬에서 실행해 통과시킨다.
+
+### 테스트 작성 규칙
+- 함수·클래스를 만들면 **같은 PR에서** 테스트를 함께 작성한다.
+- 테스트 파일은 코드 옆의 `tests/` 폴더에 `test_<모듈명>.py`로 만들고, 함수 이름은 `test_`로 시작한다.
+  - 예) `ai/preprocessing.py` → `ai/tests/test_preprocessing.py`
+- 특히 다음 로직은 반드시 테스트한다: 전처리(윈도우 분할·정규화), 신뢰도 기준 판단, 위험도별 실행 분기, 3초 취소 판정.
+- 테스트에 센서 원본 데이터 파일을 쓰지 않는다. 작은 가짜 데이터를 코드 안에서 만들어 쓴다.
+
+### Kotlin (앱)
+- Android 프로젝트가 생성되면 ktlint / Android Lint와 JUnit 테스트를 CI에 추가한다 (#30).
+
 ## 브랜치 전략
 ```
 main        ← 항상 실행 가능한 안정 버전 (직접 push 금지, PR로만 merge)
@@ -130,6 +156,7 @@ git push -u origin feature/#12-gesture-register
 - 답변과 설명은 한국어로 한다.
 - 작성하거나 수정한 코드는 무엇을 왜 그렇게 했는지 자세히 설명한다.
 - 클래스·모듈을 구현하거나 구조를 바꾸면, "설계 문서화 (UML)" 규칙에 따라 해당 `.puml` 파일도 함께 작성·수정하고 다이어그램 내용을 설명한다.
+- 코드를 작성하면 테스트도 함께 작성하고, 작업을 마치기 전에 `ruff check .`, `ruff format --check .`, `pytest`를 실행해 결과를 사용자에게 알린다.
 - 작업 전에 지금 브랜치가 `main`/`dev`가 아닌 작업 브랜치인지 확인한다. 아니면 위 규칙대로 브랜치를 만들자고 제안한다.
 - 커밋과 push는 사용자가 요청할 때만 하며, 위 커밋 메시지 규칙을 따른다.
 - 다른 팀원 담당 영역의 파일을 크게 고쳐야 하면, 먼저 사용자에게 알리고 이슈/Discord로 공유하도록 권한다.

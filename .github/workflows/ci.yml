@@ -1,0 +1,57 @@
+# PR을 올리거나 main/dev에 push하면 자동으로 lint와 테스트를 실행한다.
+name: CI
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+
+# 같은 브랜치에 새 커밋이 올라오면 이전 실행은 취소한다.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    name: Python lint & test
+    runs-on: ubuntu-latest
+    steps:
+      - name: 코드 가져오기
+        uses: actions/checkout@v4
+
+      - name: Python 설치 (.python-version 기준)
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: requirements*.txt
+
+      - name: 의존성 설치
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Lint (ruff check)
+        run: ruff check --output-format=github .
+
+      - name: 포맷 검사 (ruff format)
+        run: ruff format --check .
+
+      - name: 테스트 (pytest)
+        run: |
+          set +e
+          pytest
+          code=$?
+          # 종료 코드 5 = 테스트가 하나도 없음. 코드가 생기기 전까지는 통과로 처리한다.
+          if [ "$code" -eq 5 ]; then
+            echo "::notice::아직 테스트가 없습니다."
+            exit 0
+          fi
+          exit "$code"
+
+  # TODO(#30): Android 프로젝트가 생성되면 Kotlin lint(ktlint / Android Lint)와 JUnit 테스트 job을 추가한다.

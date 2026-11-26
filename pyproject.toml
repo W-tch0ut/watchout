@@ -1,0 +1,13 @@
+# Python 도구 설정 (ruff: lint·포맷, pytest: 테스트)
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# E/W: 스타일, F: 버그 가능성(안 쓰는 변수·import 등), I: import 정렬,
+# B: 흔한 실수 패턴, UP: 최신 문법 권장
+select = ["E", "W", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
