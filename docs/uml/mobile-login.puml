@@ -12,6 +12,7 @@ package "com.watchout.mobile" {
     class AppContainer {
         + authRepository: AuthRepository
         + guardianRepository: GuardianRepository
+        + profileRepository: ProfileRepository
         + googleSignIn: GoogleSignInHelper
     }
     class MainActivity {
