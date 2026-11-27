@@ -23,12 +23,13 @@ object GuardianValidator {
 
     /**
      * 사용자가 어떤 모양으로 입력해도 숫자만 남긴다.
-     * "010-1234-5678", "010 1234 5678", "+82 10-1234-5678" → "01012345678"
+     * "010-1234-5678", "010 1234 5678", "+82 10-1234-5678", "+82 010-1234-5678" → "01012345678"
      * 올바른 휴대폰 번호가 아니면 null.
      */
     fun normalizePhone(raw: String): String? {
         var digits = raw.filter { it.isDigit() }
-        if (raw.trim().startsWith("+82")) digits = "0" + digits.removePrefix("82")
+        // 국가번호 82를 떼고 앞에 0을 하나만 붙인다 (+82 뒤에 0을 써도, 안 써도 같은 결과)
+        if (raw.trim().startsWith("+82")) digits = "0" + digits.removePrefix("82").removePrefix("0")
         return digits.takeIf { MOBILE_PATTERN.matches(it) }
     }
 

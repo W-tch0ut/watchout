@@ -1,6 +1,7 @@
 package com.watchout.mobile.auth
 
 import com.watchout.mobile.MainDispatcherExtension
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -68,6 +69,21 @@ class LoginViewModelTest {
     }
 
     @Test
+    fun `로그인 실패 뒤 화면이 비운 비밀번호를 알려와도 오류 안내는 남는다`() {
+        repo.failWith = AuthError.WRONG_CREDENTIALS
+        type("family@test.example", "abcd1234")
+        vm.submitEmail()
+
+        // 화면(LoginScreen)이 입력칸을 비우면서 ""을 다시 보내는 상황
+        vm.onPasswordChange("")
+        assertEquals(AuthError.WRONG_CREDENTIALS, vm.state.value.error)
+
+        // 사용자가 새로 입력하기 시작하면 그때 지운다
+        vm.onPasswordChange("a")
+        assertNull(vm.state.value.error)
+    }
+
+    @Test
     fun `구글 로그인은 받은 토큰으로 저장소를 부른다`() {
         vm.signInWithGoogle { "fake-id-token" }
 
@@ -95,6 +111,20 @@ class LoginViewModelTest {
     fun `비밀번호 재설정 메일을 보내면 안내를 띄운다`() {
         vm.onEmailChange("family@test.example")
         vm.sendPasswordReset()
+
+        assertEquals(listOf("reset:family@test.example"), repo.calls)
+        assertTrue(vm.state.value.resetEmailSent)
+    }
+
+    @Test
+    fun `재설정 버튼을 연달아 눌러도 메일은 한 번만 요청한다`() {
+        val gate = CompletableDeferred<Unit>()
+        repo.resetGate = gate
+        vm.onEmailChange("family@test.example")
+
+        vm.sendPasswordReset()
+        vm.sendPasswordReset() // 보내는 중에 또 누름
+        gate.complete(Unit)
 
         assertEquals(listOf("reset:family@test.example"), repo.calls)
         assertTrue(vm.state.value.resetEmailSent)

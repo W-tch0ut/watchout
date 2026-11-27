@@ -1,5 +1,6 @@
 package com.watchout.mobile.auth
 
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -37,8 +38,12 @@ class FakeAuthRepository : AuthRepository {
         return login(email)
     }
 
+    /** 값을 넣어 두면 재설정 요청이 이 신호를 받을 때까지 "보내는 중"에 머문다. */
+    var resetGate: CompletableDeferred<Unit>? = null
+
     override suspend fun sendPasswordReset(email: String): Result<Unit> {
         calls += "reset:$email"
+        resetGate?.await()
         return failWith?.let { Result.failure(AuthException(it)) } ?: Result.success(Unit)
     }
 

@@ -5,8 +5,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.watchout.mobile.auth.LoginViewModel
@@ -35,6 +39,14 @@ class MainActivity : ComponentActivity() {
                 val scope = rememberCoroutineScope()
                 val current = user
 
+                // 로그아웃할 때마다 1씩 늘어나는 번호. 화면을 돌려도(rememberSaveable) 유지된다.
+                // 연락처 ViewModel의 이름표(key)에 넣어서, 다시 로그인하면 항상 새 ViewModel을 만든다.
+                // (같은 계정이라도 로그아웃 때 끊긴 Firestore 실시간 연결을 다시 쓰지 않게)
+                var signOutCount by rememberSaveable { mutableIntStateOf(0) }
+                LaunchedEffect(current == null) {
+                    if (current == null) signOutCount++
+                }
+
                 if (current == null) {
                     val vm: LoginViewModel = viewModel(factory = LoginViewModel.factory(container.authRepository))
                     LoginScreen(
@@ -44,9 +56,9 @@ class MainActivity : ComponentActivity() {
                         },
                     )
                 } else {
-                    // key = uid: 다른 계정으로 다시 로그인하면 새 ViewModel을 만든다 (이전 사람 연락처가 남지 않게)
+                    // key = uid + 로그아웃 횟수: 다른 계정이든 같은 계정이든 다시 로그인하면 새 ViewModel
                     val vm: GuardianViewModel = viewModel(
-                        key = current.uid,
+                        key = "${current.uid}#$signOutCount",
                         factory = GuardianViewModel.factory(current.uid, container.guardianRepository),
                     )
                     GuardianScreen(

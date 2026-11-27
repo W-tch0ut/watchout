@@ -38,7 +38,14 @@ class LoginViewModel(private val repo: AuthRepository) : ViewModel() {
 
     fun onEmailChange(email: String) = _state.update { it.copy(email = email, error = null, resetEmailSent = false) }
 
-    fun onPasswordChange(password: String) = _state.update { it.copy(password = password, error = null) }
+    /**
+     * 비밀번호를 실제로 바꿨을 때만 오류를 지운다.
+     * 로그인 실패 뒤 ViewModel이 비밀번호를 ""로 비우면, 화면의 입력칸도 비워지면서 ""이 다시 여기로 온다.
+     * 이때 오류까지 지우면 "비밀번호가 맞지 않아요" 같은 안내가 보이자마자 사라진다.
+     */
+    fun onPasswordChange(password: String) = _state.update {
+        if (it.password == password) it else it.copy(password = password, error = null)
+    }
 
     /** 로그인 ↔ 회원가입 전환 */
     fun toggleMode() = _state.update {
@@ -75,6 +82,7 @@ class LoginViewModel(private val repo: AuthRepository) : ViewModel() {
 
     /** 비밀번호 재설정 메일 보내기. 입력한 이메일로 보낸다. */
     fun sendPasswordReset() {
+        if (_state.value.isLoading) return // 여러 번 눌러도 메일은 한 통만
         val email = CredentialValidator.normalizeEmail(_state.value.email)
         val invalid = CredentialValidator.validateEmail(email)
         if (invalid != null) {

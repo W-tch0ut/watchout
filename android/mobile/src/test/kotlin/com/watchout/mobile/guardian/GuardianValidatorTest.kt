@@ -18,6 +18,7 @@ class GuardianValidatorTest {
         assertEquals("01000000000", GuardianValidator.normalizePhone("010-0000-0000"))
         assertEquals("01000000000", GuardianValidator.normalizePhone("010 0000 0000"))
         assertEquals("01000000000", GuardianValidator.normalizePhone("+82 10-0000-0000"))
+        assertEquals("01000000000", GuardianValidator.normalizePhone("+82 010-0000-0000")) // 0을 붙여 써도
         assertEquals("0110000000", GuardianValidator.normalizePhone("011-000-0000"))
     }
 
