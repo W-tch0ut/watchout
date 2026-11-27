@@ -26,18 +26,21 @@ import com.watchout.wear.ui.RecordScreen
 import com.watchout.wear.ui.RegisterGestureScreen
 import com.watchout.wear.ui.RemoteRegOverlay
 import com.watchout.wear.ui.SamsungCollectScreen
+import com.watchout.wear.ui.VoiceScreen
+import com.watchout.wear.voice.VoiceViewModel
 
 /**
  * 화면 구성. 오른쪽으로 밀면 이전 화면으로 돌아간다.
  *
- * menu ─┬─ car                 로봇카 찾기·연결, 명령 버튼, 최근 기록     (데모)
- *       ├─ gestures ─ gesture_new ─ gesture_register/{i}   내 제스처 등록 (데모)
- *       ├─ fall                낙상 감지 켜기·테스트                    (데모)
- *       ├─ recognize           실시간 인식                            (개발 도구)
- *       ├─ collect ─ record/{id}   라벨 고르기 → 녹화                 (개발 도구)
- *       └─ samsung            삼성 유니버설 제스처 수집               (개발 도구)
+ * menu ─┬─ car                 로봇카 연결 상태, 최근 기록 (연결은 폰 앱)  (사용자)
+ *       ├─ gestures ─ gesture_new ─ gesture_register/{i}   내 제스처 목록 (등록은 폰 앱, 워치 등록은 개발자 모드)
+ *       ├─ voice               음성 명령 (누른 채로 말하기, #69)       (사용자)
+ *       ├─ fall                낙상 감지 켜기·테스트                    (개발자 모드)
+ *       ├─ recognize           실시간 인식                            (개발자 모드)
+ *       ├─ collect ─ record/{id}   라벨 고르기 → 녹화                 (개발자 모드)
+ *       └─ samsung            삼성 유니버설 제스처 수집               (개발자 모드)
  *
- * 낙상 의심·결과는 어느 화면에 있든 위에 덮어서 보여준다. ([FallOverlay])
+ * 낙상 의심·결과([FallOverlay])와 폰에서 시작한 제스처 등록([RemoteRegOverlay])은 어느 화면에 있든 위에 덮어서 보여준다.
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -68,6 +71,7 @@ class MainActivity : ComponentActivity() {
                                 onCar = { nav.navigate("car") },
                                 onGestures = { nav.navigate("gestures") },
                                 onFall = { nav.navigate("fall") },
+                                onVoice = { nav.navigate("voice") },
                                 gestureCount = demo.gestures.size,
                                 devMode = demo.devMode,
                                 onTitleTap = demo::onTitleTap,
@@ -87,6 +91,7 @@ class MainActivity : ComponentActivity() {
                             val (name, cmd) = DemoViewModel.NAME_PRESETS[i]
                             RegisterGestureScreen(demo, name, cmd, onDone = { nav.popBackStack("gestures", false) })
                         }
+                        composable("voice") { VoiceScreen(viewModel<VoiceViewModel>()) }
                         composable("fall") { FallScreen(demo) }
                         composable("samsung") { SamsungCollectScreen(vm) }
                         composable("recognize") { RecognizeScreen(vm) }

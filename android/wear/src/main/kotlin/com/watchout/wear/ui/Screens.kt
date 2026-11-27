@@ -101,7 +101,7 @@ private fun DevTitle(onTitleTap: () -> Unit) {
 }
 
 /**
- * 사용자 첫 화면: 스크롤 없이 한 화면에 로봇카 상태와 내 제스처 두 개만 보여준다.
+ * 사용자 첫 화면: 스크롤 없이 한 화면에 로봇카 상태 · 내 제스처 · 음성 명령 세 개만 보여준다.
  * 낙상 감지는 로봇카에 연결되면 뒤에서 돌고, 감지되면 팝업만 뜬다.
  */
 @Composable
@@ -110,6 +110,7 @@ private fun HomeScreen(
     sensorsAvailable: Boolean,
     onCar: () -> Unit,
     onGestures: () -> Unit,
+    onVoice: () -> Unit,
     onTitleTap: () -> Unit,
 ) {
     Scaffold(timeText = { TimeText() }) {
@@ -117,7 +118,7 @@ private fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+            verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             DevTitle(onTitleTap = onTitleTap)
@@ -137,6 +138,12 @@ private fun HomeScreen(
                 onClick = onGestures,
                 enabled = sensorsAvailable,
             )
+            Chip(
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("🎤 음성 명령") },
+                secondaryLabel = { Text("누른 채로 \"이리 와\"") },
+                onClick = onVoice,
+            )
         }
     }
 }
@@ -149,6 +156,7 @@ fun MenuScreen(
     onSamsungCollect: () -> Unit,
     onCar: () -> Unit,
     onGestures: () -> Unit,
+    onVoice: () -> Unit,
     onFall: () -> Unit,
     gestureCount: Int,
     devMode: Boolean,
@@ -158,13 +166,14 @@ fun MenuScreen(
     val context = LocalContext.current
     val titleTap: () -> Unit = { onTitleTap()?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() } }
 
-    // 사용자 화면은 버튼이 두 개뿐이라 스크롤 없이 한 화면에 고정한다
+    // 사용자 화면은 버튼이 세 개뿐이라 스크롤 없이 한 화면에 고정한다
     if (!devMode) {
         HomeScreen(
             gestureCount = gestureCount,
             sensorsAvailable = vm.sensorsAvailable,
             onCar = onCar,
             onGestures = onGestures,
+            onVoice = onVoice,
             onTitleTap = titleTap,
         )
         return
@@ -175,7 +184,7 @@ fun MenuScreen(
         if (!vm.sensorsAvailable) {
             item { Text("⚠ 가속도·자이로 센서가 없어요", color = Color(0xFFFF8A80), textAlign = TextAlign.Center) }
         }
-        // ----- 사용자 화면: 로봇카 연결, 내 제스처 (낙상 감지는 연결되면 뒤에서 돌고, 감지되면 팝업만 뜬다) -----
+        // ----- 사용자 화면: 로봇카, 내 제스처, 음성 명령 (낙상 감지는 연결되면 뒤에서 돌고, 감지되면 팝업만 뜬다) -----
         item {
             Chip(
                 modifier = Modifier.fillMaxWidth(),
@@ -191,6 +200,14 @@ fun MenuScreen(
                 secondaryLabel = { Text("${gestureCount}개 등록됨") },
                 onClick = onGestures,
                 enabled = vm.sensorsAvailable,
+            )
+        }
+        item {
+            Chip(
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("🎤 음성 명령") },
+                secondaryLabel = { Text("누른 채로 \"이리 와\"") },
+                onClick = onVoice,
             )
         }
         // ----- 개발자 모드 -----

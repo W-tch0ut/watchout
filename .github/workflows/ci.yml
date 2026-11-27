@@ -73,13 +73,13 @@ jobs:
       - name: Gradle 캐시
         uses: gradle/actions/setup-gradle@v4
 
-      # :gesture 단위 테스트 → 워치 앱 빌드 → 폰 앱 테스트·빌드 → Android Lint
+      # :gesture·:command 단위 테스트 → 워치 앱 빌드 → 폰 앱 테스트·빌드 → Android Lint
       # (google-services.json이 없어도 :mobile은 빌드된다. android/mobile/build.gradle.kts 참고)
       # (필요한 Android SDK 플랫폼은 AGP가 자동으로 내려받는다)
       - name: 테스트·빌드·Lint
         run: |
           chmod +x gradlew
-          ./gradlew --console=plain :gesture:test :wear:assembleDebug :wear:lintDebug \
+          ./gradlew --console=plain :gesture:test :command:test :wear:assembleDebug :wear:lintDebug \
             :mobile:testDebugUnitTest :mobile:assembleDebug :mobile:lintDebug
 
   # TODO(#30): ktlint 추가

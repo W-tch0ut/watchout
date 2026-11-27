@@ -81,6 +81,10 @@ package "com.watchout.wear" {
     }
 }
 
+package "com.watchout.wear.voice (자세한 구조: watch-voice.puml)" {
+    class VoiceViewModel
+}
+
 package "com.watchout.gesture (:gesture)" {
     interface GestureRecognizer
     class RuleBasedGestureRecognizer
@@ -91,6 +95,7 @@ package "com.watchout.gesture (:gesture)" {
 }
 
 MainActivity --> GestureToolViewModel
+MainActivity --> VoiceViewModel : 음성 명령 화면 (#69)
 GestureToolViewModel *-- SensorStreamer
 GestureToolViewModel *-- RecordingStore
 GestureToolViewModel *-- RuleBasedGestureRecognizer
