@@ -47,6 +47,10 @@ class WatchMessageListener : WearableListenerService() {
         val label = CarCommand.entries.firstOrNull { c ->
             c.wireCmd == m["cmd"] && c.args.all { (k, v) -> m[k]?.toString() == v.toString() }
         }?.label ?: (m["cmd"] as? String ?: "?")
-        return if (gesture != null) "✋ $gesture → $label" else "▶ $label"
+        return when {
+            gesture != null -> "✋ $gesture → $label"
+            m["source"] == "voice" -> "🎤 $label" // 워치 음성 명령 (#71)
+            else -> "▶ $label"
+        }
     }
 }

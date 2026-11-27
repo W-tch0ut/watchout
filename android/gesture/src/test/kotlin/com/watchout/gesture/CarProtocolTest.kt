@@ -37,6 +37,19 @@ class CarProtocolTest {
     }
 
     @Test
+    fun `음성 명령(#71)에 source와 시각을 덧붙인다`() {
+        assertEquals(
+            """{"cmd":"grab","target":"phone","source":"voice","ts":7}""",
+            CarProtocol.withSource("""{"cmd":"grab","target":"phone"}""", "voice", 7),
+        )
+        assertEquals(
+            """{"cmd":"turn","angle_deg":-90,"source":"voice","ts":7}""",
+            CarProtocol.withSource("""{"cmd":"turn","angle_deg":-90}""", "voice", 7),
+        )
+        assertEquals("not json", CarProtocol.withSource("not json", "voice", 7)) // 명령이 아니면 그대로
+    }
+
+    @Test
     fun `버튼으로 보낸 명령은 gesture가 null이다`() {
         val m = Json.parseFlat(CarProtocol.command(CarCommand.STOP, "button", null, 1))
 

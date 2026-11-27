@@ -39,6 +39,16 @@ object CarProtocol {
             },
         )
 
+    /**
+     * 다른 곳(음성 명령 #71 `RobotCommand.toJson()`)에서 만든 명령에 어디서 왔는지와 시각을 덧붙인다.
+     * `{"cmd":"stop"}` → `{"cmd":"stop","source":"voice","ts":…}`. 명령 형식이 아니면 그대로 돌려준다.
+     */
+    fun withSource(json: String, source: String, ts: Long): String {
+        val m = runCatching { Json.parseFlat(json) }.getOrNull() ?: return json
+        if (m["cmd"] !is String) return json
+        return Json.obj(LinkedHashMap(m).apply { put("source", source); put("ts", ts) })
+    }
+
     fun fallSuspected(ts: Long, impactG: Float, source: String): String =
         Json.obj(
             linkedMapOf(
