@@ -1,7 +1,7 @@
 // WatchOut Android 프로젝트
 // - :gesture  제스처 인식 로직 (순수 Kotlin, 안드로이드 없이 PC에서 테스트 가능)
 // - :wear     Wear OS 워치 앱 (지금은 제스처 판독·데이터 수집 툴)
-// - :mobile   폰 앱 (보호자/환자 로그인) — 다음 단계에서 추가
+// - :mobile   폰 앱 (로그인, 보호자 연락처 등록·수정) — #49
 pluginManagement {
     repositories {
         google()
@@ -19,4 +19,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "watchout"
-include(":gesture", ":wear")
+include(":gesture", ":wear", ":mobile")

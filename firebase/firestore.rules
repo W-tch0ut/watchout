@@ -1,0 +1,33 @@
+// WatchOut Firestore 보안 규칙 (#49)
+//
+// 적용 방법: Firebase 콘솔 → Firestore Database → 규칙 탭에 이 파일 내용을 붙여넣고 "게시".
+// 이 파일이 기준이다. 콘솔에서 고쳤다면 이 파일도 같이 고친다.
+//
+// 원칙
+// - 기본은 전부 거부한다. 아래에 적은 경로만 허용한다.
+// - 보호자 연락처는 로그인한 "본인"만 읽고 쓸 수 있다.
+// - 앱의 GuardianValidator와 같은 규칙으로 값을 한 번 더 검사한다.
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // 앱(GuardianValidator)과 같은 규칙: 이름 1~20자, 관계 1~10자, 휴대폰 번호 숫자만
+    function isValidGuardian(d) {
+      return d.keys().hasOnly(['name', 'relation', 'phone', 'updatedAt'])
+        && d.name is string && d.name.size() >= 1 && d.name.size() <= 20
+        && d.relation is string && d.relation.size() >= 1 && d.relation.size() <= 10
+        && d.phone is string && d.phone.matches('^01[016789][0-9]{7,8}$')
+        && d.updatedAt == request.time;
+    }
+
+    match /users/{uid}/guardians/{guardianId} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && isValidGuardian(request.resource.data);
+    }
+  }
+}

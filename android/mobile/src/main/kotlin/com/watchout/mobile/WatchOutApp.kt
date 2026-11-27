@@ -1,0 +1,29 @@
+package com.watchout.mobile
+
+import android.app.Application
+import android.content.Context
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.watchout.mobile.auth.AuthRepository
+import com.watchout.mobile.auth.FirebaseAuthRepository
+import com.watchout.mobile.auth.GoogleSignInHelper
+import com.watchout.mobile.guardian.FirestoreGuardianRepository
+import com.watchout.mobile.guardian.GuardianRepository
+
+/**
+ * 앱 전체에서 함께 쓰는 부품 보관함.
+ * 저장소를 한 번만 만들어 모든 화면이 같은 것을 쓰게 한다.
+ * (by lazy: 처음 쓸 때 만든다)
+ */
+class AppContainer(context: Context) {
+    val authRepository: AuthRepository by lazy { FirebaseAuthRepository(FirebaseAuth.getInstance()) }
+    val guardianRepository: GuardianRepository by lazy {
+        FirestoreGuardianRepository(FirebaseFirestore.getInstance())
+    }
+    val googleSignIn: GoogleSignInHelper by lazy { GoogleSignInHelper(context.applicationContext) }
+}
+
+/** 앱이 켜질 때 가장 먼저 만들어지는 객체. AndroidManifest의 android:name으로 연결한다. */
+class WatchOutApp : Application() {
+    val container: AppContainer by lazy { AppContainer(this) }
+}
