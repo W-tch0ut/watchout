@@ -1,0 +1,237 @@
+' 폰 앱 (:mobile 모듈) — 로그인과 보호자 연락처 (#49)
+' 1) 클래스 구조  2) 구글 로그인 흐름  3) 보호자 연락처 저장 흐름
+
+@startuml mobile-login-classes
+title 폰 앱 로그인·보호자 연락처 — 클래스 구조
+skinparam classAttributeIconSize 0
+
+package "com.watchout.mobile" {
+    class WatchOutApp {
+        + container: AppContainer
+    }
+    class AppContainer {
+        + authRepository: AuthRepository
+        + guardianRepository: GuardianRepository
+        + googleSignIn: GoogleSignInHelper
+    }
+    class MainActivity {
+        + onCreate(savedInstanceState: Bundle?): Unit
+    }
+}
+
+package "com.watchout.mobile.auth" {
+    interface AuthRepository {
+        + currentUser: StateFlow<AppUser?>
+        + signInWithGoogle(idToken: String): Result<AppUser>
+        + signInWithEmail(email: String, password: String): Result<AppUser>
+        + signUpWithEmail(email: String, password: String): Result<AppUser>
+        + sendPasswordReset(email: String): Result<Unit>
+        + signOut(): Unit
+    }
+    class FirebaseAuthRepository {
+        - auth: FirebaseAuth
+        - runAuth(block: suspend () -> FirebaseUser?): Result<AppUser>
+        - toAuthError(e: Exception): AuthError
+    }
+    class GoogleSignInHelper {
+        - serverClientId: String
+        + requestIdToken(activityContext: Context): String
+        + clearState(context: Context): Unit
+    }
+    class LoginViewModel {
+        - repo: AuthRepository
+        + state: StateFlow<LoginUiState>
+        + onEmailChange(email: String): Unit
+        + onPasswordChange(password: String): Unit
+        + toggleMode(): Unit
+        + submitEmail(): Unit
+        + signInWithGoogle(getIdToken: suspend () -> String): Unit
+        + sendPasswordReset(): Unit
+    }
+    class LoginUiState {
+        + email: String
+        + password: String
+        + mode: LoginMode
+        + isLoading: Boolean
+        + error: AuthError?
+        + resetEmailSent: Boolean
+    }
+    class AppUser {
+        + uid: String
+        + email: String?
+        + displayName: String?
+    }
+    class CredentialValidator <<object>> {
+        + MIN_PASSWORD_LENGTH: Int
+        + normalizeEmail(email: String): String
+        + validateEmail(email: String): AuthError?
+        + validatePassword(password: String, isSignUp: Boolean): AuthError?
+    }
+    class AuthErrorMapper <<object>> {
+        + fromFirebaseCode(code: String?): AuthError
+    }
+    enum AuthError {
+        INVALID_EMAIL
+        WRONG_CREDENTIALS
+        EMAIL_IN_USE
+        CANCELLED
+        ...
+        + message: String
+    }
+    class AuthException {
+        + error: AuthError
+    }
+}
+
+package "com.watchout.mobile.guardian" {
+    interface GuardianRepository {
+        + observe(uid: String): Flow<List<Guardian>>
+        + save(uid: String, guardian: Guardian): Unit
+        + delete(uid: String, guardianId: String): Unit
+    }
+    class FirestoreGuardianRepository {
+        - db: FirebaseFirestore
+        - guardians(uid: String): CollectionReference
+    }
+    class GuardianViewModel {
+        - uid: String
+        - repo: GuardianRepository
+        + guardians: StateFlow<List<Guardian>>
+        + editor: StateFlow<GuardianEditor?>
+        + listError: StateFlow<GuardianError?>
+        + startAdd(): Unit
+        + startEdit(g: Guardian): Unit
+        + save(): Unit
+        + delete(guardianId: String): Unit
+        + cancelEdit(): Unit
+    }
+    class Guardian {
+        + id: String?
+        + name: String
+        + relation: String
+        + phone: String
+    }
+    class GuardianEditor {
+        + id: String?
+        + name: String
+        + relation: String
+        + phone: String
+        + error: GuardianError?
+        + isSaving: Boolean
+    }
+    class GuardianValidator <<object>> {
+        + MAX_GUARDIANS: Int
+        + normalizePhone(raw: String): String?
+        + formatPhone(digits: String): String
+        + validate(input: Guardian, existingCount: Int): GuardianValidation
+    }
+    interface GuardianValidation
+    class "GuardianValidation.Valid" as Valid {
+        + guardian: Guardian
+    }
+    class "GuardianValidation.Invalid" as Invalid {
+        + error: GuardianError
+    }
+    enum GuardianError {
+        INVALID_PHONE
+        TOO_MANY
+        SAVE_FAILED
+        ...
+        + message: String
+    }
+}
+
+package "com.watchout.mobile.ui" {
+    class LoginScreen <<Composable>>
+    class GuardianScreen <<Composable>>
+}
+
+WatchOutApp *-- AppContainer
+AppContainer *-- AuthRepository
+AppContainer *-- GuardianRepository
+AppContainer *-- GoogleSignInHelper
+MainActivity --> AppContainer
+MainActivity --> LoginScreen
+MainActivity --> GuardianScreen
+
+AuthRepository <|.. FirebaseAuthRepository
+FirebaseAuthRepository --> AuthErrorMapper
+FirebaseAuthRepository --> AppUser
+LoginScreen --> LoginViewModel
+LoginViewModel o-- AuthRepository
+LoginViewModel *-- LoginUiState
+LoginViewModel --> CredentialValidator
+LoginViewModel ..> GoogleSignInHelper : 토큰 받는 함수를\n화면에서 넘겨받음
+LoginUiState --> AuthError
+AuthException --> AuthError
+
+GuardianRepository <|.. FirestoreGuardianRepository
+GuardianScreen --> GuardianViewModel
+GuardianViewModel o-- GuardianRepository
+GuardianViewModel *-- GuardianEditor
+GuardianViewModel --> GuardianValidator
+GuardianValidation <|.. Valid
+GuardianValidation <|.. Invalid
+GuardianValidator --> GuardianValidation
+Valid --> Guardian
+@enduml
+
+@startuml mobile-google-sign-in
+title 구글 로그인 흐름
+actor 보호자
+participant LoginScreen
+participant LoginViewModel
+participant GoogleSignInHelper
+participant "Credential Manager\n(Android)" as CM
+participant FirebaseAuthRepository
+participant "Firebase Auth" as FA
+participant MainActivity
+
+보호자 -> LoginScreen : [구글 계정으로 로그인]
+LoginScreen -> LoginViewModel : signInWithGoogle(getIdToken)
+LoginViewModel -> LoginViewModel : isLoading = true
+LoginViewModel -> GoogleSignInHelper : requestIdToken(activity)
+GoogleSignInHelper -> CM : getCredential(GetSignInWithGoogleOption)
+CM -> 보호자 : 계정 선택 창
+alt 계정을 고름
+    CM --> GoogleSignInHelper : GoogleIdTokenCredential
+    GoogleSignInHelper --> LoginViewModel : idToken
+    LoginViewModel -> FirebaseAuthRepository : signInWithGoogle(idToken)
+    FirebaseAuthRepository -> FA : signInWithCredential
+    FA --> FirebaseAuthRepository : FirebaseUser\n(세션은 SDK가 앱 전용 저장소에 보관)
+    FA -> FirebaseAuthRepository : AuthStateListener
+    FirebaseAuthRepository -> MainActivity : currentUser = AppUser
+    MainActivity -> MainActivity : GuardianScreen으로 바꿈
+else 취소
+    CM --> GoogleSignInHelper : GetCredentialCancellationException
+    GoogleSignInHelper --> LoginViewModel : AuthException(CANCELLED)
+    LoginViewModel -> LoginScreen : error = "로그인을 취소했어요."
+end
+@enduml
+
+@startuml mobile-guardian-save
+title 보호자 연락처 저장 흐름
+actor 보호자
+participant GuardianScreen
+participant GuardianViewModel
+participant GuardianValidator
+participant FirestoreGuardianRepository
+database "Firestore\nusers/{uid}/guardians" as FS
+
+보호자 -> GuardianScreen : 이름·관계·번호 입력 후 [저장]
+GuardianScreen -> GuardianViewModel : save()
+GuardianViewModel -> GuardianValidator : validate(input, existingCount)
+alt 입력값이 틀림
+    GuardianValidator --> GuardianViewModel : Invalid(error)
+    GuardianViewModel -> GuardianScreen : 창에 오류 표시
+else 통과
+    GuardianValidator --> GuardianViewModel : Valid(번호 정리된 Guardian)
+    GuardianViewModel -> FirestoreGuardianRepository : save(uid, guardian)
+    FirestoreGuardianRepository -> FS : add / set (HTTPS)
+    FS -> FS : 보안 규칙 검사\n(본인인가? 값이 올바른가?)
+    FS --> FirestoreGuardianRepository : 성공
+    FS -> FirestoreGuardianRepository : 실시간 구독으로 새 목록
+    FirestoreGuardianRepository -> GuardianViewModel : guardians 갱신
+    GuardianViewModel -> GuardianScreen : 창 닫고 목록 다시 그림
+end
+@enduml

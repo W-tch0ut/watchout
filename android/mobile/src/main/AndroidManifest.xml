@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Firebase 로그인·Firestore 통신 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+        로그인 정보(Firebase 세션)와 앱 데이터가 구글 드라이브 백업이나 다른 기기로 복사되지 않게 막는다.
+        allowBackup="false": Android 11 이하 / dataExtractionRules: Android 12 이상
+        (Android 11 이하는 allowBackup="false"로 이미 백업이 꺼져서 fullBackupContent가 필요 없다 → lint 경고 무시)
+    -->
+    <application
+        android:name=".WatchOutApp"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        tools:ignore="DataExtractionRules"
+        android:icon="@android:drawable/sym_def_app_icon"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
