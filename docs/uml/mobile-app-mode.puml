@@ -1,4 +1,4 @@
-' 폰 앱 (:mobile 모듈) — 본인(환자) / 보호자 모드 (#66)
+' 폰 앱 (:mobile 모듈) — 본인(환자) / 보호자 모드 (#66, #50)
 ' 1) 클래스 구조  2) 로그인 후 화면 고르기 흐름
 ' 로그인·보호자 연락처 클래스는 mobile-login.puml 참고
 
@@ -52,11 +52,13 @@ package "com.watchout.mobile.ui" {
     class RoleScreens <<Composable>> {
         + LoadingScreen(): Unit
         + RoleSelectScreen(current: UserRole?, isSaving: Boolean, error: ProfileError?, canCancel: Boolean, ...): Unit
-        + GuardianHomeScreen(user: AppUser, onChangeMode: () -> Unit, onSignOut: () -> Unit): Unit
         + ModeHeader(title: String, user: AppUser, ...): Unit
     }
     class GuardianScreen <<Composable>> {
-        + GuardianScreen(vm: GuardianViewModel, user: AppUser, onChangeMode: () -> Unit, onSignOut: () -> Unit): Unit
+        + GuardianScreen(vm: GuardianViewModel, patientVm: PatientViewModel, user: AppUser, onChangeMode: () -> Unit, onSignOut: () -> Unit): Unit
+    }
+    class GuardianHomeScreen <<Composable>> {
+        + GuardianHomeScreen(vm: GuardianHomeViewModel, user: AppUser, onChangeMode: () -> Unit, onSignOut: () -> Unit): Unit
     }
 }
 
@@ -72,7 +74,10 @@ RoleUiState --> ProfileError
 MainActivity --> RoleViewModel
 MainActivity --> RoleScreens
 MainActivity --> GuardianScreen
+MainActivity --> GuardianHomeScreen
 GuardianScreen --> RoleScreens : ModeHeader
+GuardianHomeScreen --> RoleScreens : ModeHeader
+note bottom of GuardianHomeScreen : 연결·알림 클래스는 mobile-guardian.puml (#50)
 @enduml
 
 @startuml mobile-app-mode-flow
@@ -89,9 +94,9 @@ if (role이 없거나 "모드 바꾸기" 중?) then (예)
   :choose(role) → users/{uid}.role 저장;
 endif
 if (role) then (GUARDIAN)
-  :GuardianHomeScreen\n연결된 가족·받은 알림 자리 (#50);
+  :GuardianHomeScreen\n연결된 가족·받은 알림 (#50);
 else (PATIENT)
-  :GuardianScreen\n보호자 연락처 등록·수정 (#49);
+  :GuardianScreen\n보호자 연락처 등록·수정 (#49)\n초대 문자·테스트 응급 알림 (#50);
 endif
 :[모드 바꾸기] → 선택 화면 (취소하면 원래 화면);
 stop
