@@ -1,0 +1,3 @@
+# 줄바꿈 고정: gradlew는 Linux CI에서 실행되므로 LF, .bat은 CRLF
+android/gradlew text eol=lf
+*.bat text eol=crlf
