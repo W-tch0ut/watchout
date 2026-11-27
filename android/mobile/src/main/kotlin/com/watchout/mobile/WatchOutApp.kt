@@ -7,6 +7,14 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.watchout.mobile.auth.AuthRepository
 import com.watchout.mobile.auth.FirebaseAuthRepository
 import com.watchout.mobile.auth.GoogleSignInHelper
+import com.watchout.mobile.car.CarFinder
+import com.watchout.mobile.car.CarSession
+import com.watchout.mobile.car.ServiceCarSession
+import com.watchout.mobile.car.DataLayerWatchRepository
+import com.watchout.mobile.car.WatchRepository
+import com.watchout.mobile.car.WifiCarFinder
+import com.watchout.mobile.sms.PrefsSmsSettingsStore
+import com.watchout.mobile.sms.SmsSettingsStore
 import com.watchout.mobile.guardian.FirestoreGuardianRepository
 import com.watchout.mobile.guardian.GuardianRepository
 import com.watchout.mobile.profile.FirestoreProfileRepository
@@ -26,6 +34,12 @@ class AppContainer(context: Context) {
         FirestoreProfileRepository(FirebaseFirestore.getInstance())
     }
     val googleSignIn: GoogleSignInHelper by lazy { GoogleSignInHelper(context.applicationContext) }
+
+    // 로봇카 찾기(Wi-Fi)·워치 연결(Data Layer)·응급 문자 설정 (#42 데모)
+    val carFinder: CarFinder by lazy { WifiCarFinder(context.applicationContext) }
+    val watchRepository: WatchRepository by lazy { DataLayerWatchRepository(context.applicationContext) }
+    val carSession: CarSession by lazy { ServiceCarSession(context.applicationContext) }
+    val smsSettingsStore: SmsSettingsStore by lazy { PrefsSmsSettingsStore(context.applicationContext) }
 }
 
 /** 앱이 켜질 때 가장 먼저 만들어지는 객체. AndroidManifest의 android:name으로 연결한다. */

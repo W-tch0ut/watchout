@@ -83,6 +83,13 @@ dependencies {
     implementation(libs.androidx.credentials.play.services)
     implementation(libs.googleid)
 
+    // 워치와 같은 메시지 규약(WatchLink)·로봇카 찾기(CarScanner) (#42 데모)
+    implementation(project(":gesture"))
+    // 워치와 로봇카 선택·상태를 주고받는다 (Wear OS Data Layer)
+    implementation(libs.play.services.wearable)
+    // 로봇카와 MQTT로 통신한다 (폰이 로봇카와 직접 연결하고, 워치 명령은 폰을 거쳐 간다)
+    implementation(libs.paho.mqtt)
+
     testImplementation(libs.junit.jupiter)
     testImplementation(libs.kotlinx.coroutines.test)
     testRuntimeOnly(libs.junit.platform.launcher)

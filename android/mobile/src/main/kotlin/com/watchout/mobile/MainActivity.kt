@@ -14,6 +14,14 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.watchout.mobile.auth.LoginViewModel
+import com.watchout.mobile.car.CarViewModel
+import com.watchout.mobile.gesture.GestureViewModel
+import com.watchout.mobile.ui.GestureScreen
+import com.watchout.mobile.sms.SmsViewModel
+import com.watchout.mobile.ui.CarScreen
+import com.watchout.mobile.ui.PatientHome
+import com.watchout.mobile.ui.PatientTab
+import com.watchout.mobile.ui.SmsScreen
 import com.watchout.mobile.guardian.GuardianViewModel
 import com.watchout.mobile.profile.RoleViewModel
 import com.watchout.mobile.profile.UserRole
@@ -30,7 +38,7 @@ import kotlinx.coroutines.launch
  * 로그인 상태를 보고 어떤 화면을 그릴지 정한다.
  *   로그아웃 상태          → LoginScreen
  *   로그인, 모드 안 고름   → RoleSelectScreen (본인 / 보호자)
- *   본인(환자) 모드        → GuardianScreen (보호자 연락처 등록)
+ *   본인(환자) 모드        → PatientHome 탭: CarScreen(로봇카·워치 연결) / GuardianScreen(보호자 연락처) / SmsScreen(응급 문자)
  *   보호자 모드            → GuardianHomeScreen (연결된 가족·알림 자리, #50)
  * 로그인·로그아웃하면 currentUser가 바뀌고, 화면이 자동으로 바뀐다.
  */
@@ -94,17 +102,43 @@ class MainActivity : ComponentActivity() {
                             onChangeMode = roleVm::startChange,
                             onSignOut = onSignOut,
                         )
-                        else -> { // 본인(환자) 모드: 보호자 연락처 등록
-                            val vm: GuardianViewModel = viewModel(
-                                key = "guardians:$sessionKey",
-                                factory = GuardianViewModel.factory(current.uid, container.guardianRepository),
-                            )
-                            GuardianScreen(
-                                vm = vm,
-                                user = current,
-                                onChangeMode = roleVm::startChange,
-                                onSignOut = onSignOut,
-                            )
+                        else -> PatientHome { tab -> // 본인(환자) 모드: 로봇카 / 보호자 연락처 / 응급 문자
+                            when (tab) {
+                                PatientTab.CAR -> CarScreen(
+                                    vm = viewModel(
+                                        key = "car",
+                                        factory = CarViewModel.factory(
+                                            container.carFinder,
+                                            container.carSession,
+                                            container.watchRepository,
+                                        ),
+                                    ),
+                                    user = current,
+                                    onChangeMode = roleVm::startChange,
+                                    onSignOut = onSignOut,
+                                )
+                                PatientTab.GESTURES -> GestureScreen(
+                                    vm = viewModel(key = "gestures", factory = GestureViewModel.factory(container.watchRepository)),
+                                    user = current,
+                                    onChangeMode = roleVm::startChange,
+                                    onSignOut = onSignOut,
+                                )
+                                PatientTab.GUARDIANS -> GuardianScreen(
+                                    vm = viewModel<GuardianViewModel>(
+                                        key = "guardians:$sessionKey",
+                                        factory = GuardianViewModel.factory(current.uid, container.guardianRepository),
+                                    ),
+                                    user = current,
+                                    onChangeMode = roleVm::startChange,
+                                    onSignOut = onSignOut,
+                                )
+                                PatientTab.SMS -> SmsScreen(
+                                    vm = viewModel(key = "sms", factory = SmsViewModel.factory(container.smsSettingsStore)),
+                                    user = current,
+                                    onChangeMode = roleVm::startChange,
+                                    onSignOut = onSignOut,
+                                )
+                            }
                         }
                     }
                 }
