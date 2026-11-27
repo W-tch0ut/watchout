@@ -1,5 +1,6 @@
 package com.watchout.gesture
 
+import kotlin.math.abs
 import kotlin.math.sqrt
 
 /** 중력을 뺀 가속도(lx, ly, lz)와 자이로(gx, gy, gz) 한 프레임. */
@@ -28,7 +29,11 @@ data class SegmenterConfig(
     /** 이 값을 넘으면 동작이 시작된 것으로 본다. */
     val startGyro: Float = 1.5f,
     val startLinear: Float = 3.0f,
-    /** 둘 다 이 값보다 작은 상태가 [quietHoldMs] 동안 이어지면 동작이 끝난 것으로 본다. */
+    /**
+     * 자이로가 [quietGyro]보다 작고, 가속도 크기가 중력(9.81)과 [quietLinear] 이내로 가까운 상태가
+     * [quietHoldMs] 동안 이어지면 동작이 끝난 것으로 본다.
+     * 가속도 "크기"만 보기 때문에 손목이 어느 방향으로 기울어진 채 멈춰도 판단할 수 있다.
+     */
     val quietGyro: Float = 0.6f,
     val quietLinear: Float = 1.2f,
     val quietHoldMs: Long = 200,
@@ -47,7 +52,10 @@ data class SegmenterConfig(
  * 1. 가속도에서 중력을 뺀다. 중력은 저역통과 필터로 추정한다.
  *    동작이 진행되는 동안에는 중력 추정을 멈춘다. 빠른 움직임이 중력으로 섞여 들어가지 않게 하기 위해서다.
  * 2. 움직임이 시작 기준을 넘으면 구간을 열고, 조용한 상태가 이어지면 구간을 닫는다.
- * 3. 길이가 적당한 구간만 돌려준다.
+ *    "조용함"은 손목 방향과 상관없는 값(자이로 크기, 가속도 크기 ≈ 중력)으로 판단한다.
+ *    고정해 둔 중력으로 판단하면 동작 후 손목이 조금만 기울어도 영원히 "움직이는 중"이 되기 때문이다.
+ * 3. 구간이 끝나면 중력 추정값을 지금 방향으로 바로 맞춘다.
+ * 4. 길이가 적당한 구간만 돌려준다.
  */
 class MotionSegmenter(private val config: SegmenterConfig = SegmenterConfig()) {
 
@@ -70,7 +78,9 @@ class MotionSegmenter(private val config: SegmenterConfig = SegmenterConfig()) {
         val frame = toFrame(sample)
         val t = frame.timestampMs
         val loud = frame.gyroMagnitude > config.startGyro || frame.linearMagnitude > config.startLinear
-        val quiet = frame.gyroMagnitude < config.quietGyro && frame.linearMagnitude < config.quietLinear
+        val accelMagnitude = sqrt(sample.ax * sample.ax + sample.ay * sample.ay + sample.az * sample.az)
+        val quiet = frame.gyroMagnitude < config.quietGyro &&
+            abs(accelMagnitude - GRAVITY) < config.quietLinear
 
         when (state) {
             State.IDLE -> {
@@ -95,6 +105,7 @@ class MotionSegmenter(private val config: SegmenterConfig = SegmenterConfig()) {
                     state = State.ABORTED
                     active.clear()
                 } else if (t - lastLoudMs >= config.quietHoldMs) {
+                    snapGravityTo(sample)
                     return finishSegment(t)
                 }
             }
@@ -102,6 +113,7 @@ class MotionSegmenter(private val config: SegmenterConfig = SegmenterConfig()) {
             State.ABORTED -> {
                 if (!quiet) lastLoudMs = t
                 if (t - lastLoudMs >= config.quietHoldMs) {
+                    snapGravityTo(sample)
                     state = State.IDLE
                     cooldownUntilMs = t + config.cooldownMs
                 }
@@ -136,16 +148,26 @@ class MotionSegmenter(private val config: SegmenterConfig = SegmenterConfig()) {
         }
     }
 
+    /** 멈춘 순간의 가속도를 그대로 중력으로 삼는다. 동작 뒤 손목 방향이 바뀌었어도 바로 따라간다. */
+    private fun snapGravityTo(s: SensorSample) {
+        gravity = floatArrayOf(s.ax, s.ay, s.az)
+    }
+
     private fun toFrame(s: SensorSample): MotionFrame {
         val g = gravity ?: floatArrayOf(s.ax, s.ay, s.az).also { gravity = it }
         val dt = (s.timestampMs - (lastTimestampMs ?: s.timestampMs)).coerceAtLeast(0L).toFloat()
         lastTimestampMs = s.timestampMs
-        if (state == State.IDLE) {
+        // 동작 중(ACTIVE)에만 중력을 고정한다. 버린 동작을 기다리는 동안(ABORTED)에는 계속 따라간다.
+        if (state != State.ACTIVE) {
             val alpha = config.gravityTauMs / (config.gravityTauMs + dt)
             g[0] = alpha * g[0] + (1 - alpha) * s.ax
             g[1] = alpha * g[1] + (1 - alpha) * s.ay
             g[2] = alpha * g[2] + (1 - alpha) * s.az
         }
         return MotionFrame(s.timestampMs, s.ax - g[0], s.ay - g[1], s.az - g[2], s.gx, s.gy, s.gz)
+    }
+
+    companion object {
+        const val GRAVITY = 9.81f
     }
 }

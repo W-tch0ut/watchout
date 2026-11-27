@@ -85,6 +85,22 @@ class RuleBasedGestureRecognizerTest {
     }
 
     @Test
+    fun `동작하면서 손목 각도가 바뀌어도 동작이 끝나고 다음 동작도 인식한다`() {
+        // 실제 워치에서 "반응 없음"이 났던 상황: 동작 후 손목이 25도 기울어진 채로 멈춤
+        val motion = FakeMotion().rest(500).flickWithTilt(0, 8f, tiltDeg = 25.0).rest(1000)
+            .flick(1, -8f).rest(600)
+
+        assertEquals(listOf(Gesture.PUSH, Gesture.SWING_RIGHT), recognizeOne(motion).map { it.gesture })
+    }
+
+    @Test
+    fun `손목을 천천히 기울이기만 하면 아무것도 인식하지 않는다`() {
+        val motion = FakeMotion().rest(500).flickWithTilt(0, 0f, tiltDeg = 40.0, ms = 2000).rest(1000)
+
+        assertTrue(recognizeOne(motion).isEmpty())
+    }
+
+    @Test
     fun `첫 봉우리 적분은 부호가 바뀌기 전까지만 더한다`() {
         val times = listOf(0L, 100, 200, 300, 400)
         val values = listOf(0f, 2f, 2f, -2f, -2f)

@@ -13,7 +13,22 @@ import kotlin.random.Random
 class FakeMotion(private val noise: Float = 0.05f, seed: Int = 1) {
     private val random = Random(seed)
     private var t = 0L
+
+    /** 손목 기울기 (rad). 기울면 중력이 Z축에서 Y축 쪽으로 옮겨 간다. */
+    private var tilt = 0.0
     val samples = mutableListOf<SensorSample>()
+
+    /**
+     * 갔다 오는 동작을 하는 동안 손목이 [tiltDeg]만큼 기울어서 끝난다.
+     * 실제 사람은 동작 전후로 손목 각도가 완전히 같지 않다.
+     */
+    fun flickWithTilt(axis: Int, amplitude: Float, tiltDeg: Double, ms: Long = 400): FakeMotion {
+        val startTilt = tilt
+        return motion(ms) { phase ->
+            tilt = startTilt + Math.toRadians(tiltDeg) * phase
+            FloatArray(6).also { it[axis] = amplitude * sin(2 * PI * phase).toFloat() }
+        }.also { tilt = startTilt + Math.toRadians(tiltDeg) }
+    }
 
     fun rest(ms: Long): FakeMotion = motion(ms) { _ -> FloatArray(6) }
 
@@ -39,9 +54,11 @@ class FakeMotion(private val noise: Float = 0.05f, seed: Int = 1) {
         val start = t
         while (t < start + ms) {
             val v = values((t - start).toDouble() / ms)
+            val gy = (9.81 * kotlin.math.sin(tilt)).toFloat()
+            val gz = (9.81 * kotlin.math.cos(tilt)).toFloat()
             samples += SensorSample(
                 timestampMs = t,
-                ax = v[0] + n(), ay = v[1] + n(), az = 9.81f + v[2] + n(),
+                ax = v[0] + n(), ay = gy + v[1] + n(), az = gz + v[2] + n(),
                 gx = v[3] + n(), gy = v[4] + n(), gz = v[5] + n(),
             )
             t += 20

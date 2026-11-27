@@ -5,6 +5,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import com.watchout.gesture.SampleRateLimiter
 import com.watchout.gesture.SensorSample
 
 /**
@@ -21,7 +22,7 @@ class SensorStreamer(context: Context) : SensorEventListener {
     private val gyroscope: Sensor? = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
 
     private val latestGyro = FloatArray(3)
-    private var lastEmittedMs = Long.MIN_VALUE
+    private val rateLimiter = SampleRateLimiter(MIN_INTERVAL_MS)
     private var listener: ((SensorSample) -> Unit)? = null
 
     val isAvailable: Boolean get() = accelerometer != null && gyroscope != null
@@ -31,7 +32,7 @@ class SensorStreamer(context: Context) : SensorEventListener {
         if (!isAvailable) return false
         stop()
         listener = onSample
-        lastEmittedMs = Long.MIN_VALUE
+        rateLimiter.reset()
         sensorManager.registerListener(this, gyroscope, SAMPLING_PERIOD_US)
         sensorManager.registerListener(this, accelerometer, SAMPLING_PERIOD_US)
         return true
@@ -47,8 +48,7 @@ class SensorStreamer(context: Context) : SensorEventListener {
             Sensor.TYPE_GYROSCOPE -> event.values.copyInto(latestGyro, endIndex = 3)
             Sensor.TYPE_ACCELEROMETER -> {
                 val timestampMs = event.timestamp / 1_000_000 // ns → ms
-                if (timestampMs - lastEmittedMs < MIN_INTERVAL_MS) return
-                lastEmittedMs = timestampMs
+                if (!rateLimiter.accept(timestampMs)) return
                 listener?.invoke(
                     SensorSample(
                         timestampMs = timestampMs,
