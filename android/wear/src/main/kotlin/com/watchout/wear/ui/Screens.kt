@@ -1,5 +1,8 @@
 package com.watchout.wear.ui
 
+import android.widget.Toast
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,9 +13,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -37,6 +42,8 @@ import com.watchout.gesture.WearingHand
 import com.watchout.wear.GestureToolViewModel
 import com.watchout.wear.LiveMotion
 import com.watchout.wear.RecordPhase
+import com.watchout.wear.demo.DemoState
+import com.watchout.wear.demo.connectionSummary
 import java.util.Locale
 
 /** 화면에 같이 보여줄 그림 문자 */
@@ -54,7 +61,7 @@ val Gesture.emoji: String
 
 /** 시계·스크롤 표시가 붙은 세로 목록 화면 */
 @Composable
-private fun ListScreen(content: ScalingLazyListScope.() -> Unit) {
+internal fun ListScreen(content: ScalingLazyListScope.() -> Unit) {
     val state = rememberScalingLazyListState()
     Scaffold(
         timeText = { TimeText() },
@@ -71,11 +78,66 @@ private fun ListScreen(content: ScalingLazyListScope.() -> Unit) {
 
 /** 화면이 보이는 동안 화면이 꺼지지 않게 한다. 제스처를 하는 동안 화면이 꺼지면 센서가 멈춘다. */
 @Composable
-private fun KeepScreenOn() {
+internal fun KeepScreenOn() {
     val view = LocalView.current
     DisposableEffect(view) {
         view.keepScreenOn = true
         onDispose { view.keepScreenOn = false }
+    }
+}
+
+/** 제목. 7번 연달아 누르면 개발자 모드를 켜고 끈다 (안드로이드 '빌드 번호 7번 누르기'와 같은 방식) */
+@Composable
+private fun DevTitle(onTitleTap: () -> Unit) {
+    Text(
+        "WatchOut",
+        style = MaterialTheme.typography.title3,
+        modifier = Modifier.clickable(
+            interactionSource = remember { MutableInteractionSource() },
+            indication = null,
+            onClick = onTitleTap,
+        ),
+    )
+}
+
+/**
+ * 사용자 첫 화면: 스크롤 없이 한 화면에 로봇카 상태와 내 제스처 두 개만 보여준다.
+ * 낙상 감지는 로봇카에 연결되면 뒤에서 돌고, 감지되면 팝업만 뜬다.
+ */
+@Composable
+private fun HomeScreen(
+    gestureCount: Int,
+    sensorsAvailable: Boolean,
+    onCar: () -> Unit,
+    onGestures: () -> Unit,
+    onTitleTap: () -> Unit,
+) {
+    Scaffold(timeText = { TimeText() }) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            DevTitle(onTitleTap = onTitleTap)
+            if (!sensorsAvailable) {
+                Text("⚠ 센서가 없어요", color = Color(0xFFFF8A80), style = MaterialTheme.typography.caption2)
+            }
+            Chip(
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("🚗 로봇카") },
+                secondaryLabel = { Text(DemoState.connectionSummary(), maxLines = 1) },
+                onClick = onCar,
+            )
+            Chip(
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("✋ 내 제스처") },
+                secondaryLabel = { Text("${gestureCount}개 등록됨") },
+                onClick = onGestures,
+                enabled = sensorsAvailable,
+            )
+        }
     }
 }
 
@@ -85,11 +147,62 @@ fun MenuScreen(
     onRecognize: () -> Unit,
     onCollect: () -> Unit,
     onSamsungCollect: () -> Unit,
+    onCar: () -> Unit,
+    onGestures: () -> Unit,
+    onFall: () -> Unit,
+    gestureCount: Int,
+    devMode: Boolean,
+    onTitleTap: () -> String?,
+    onExitDevMode: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val titleTap: () -> Unit = { onTitleTap()?.let { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() } }
+
+    // 사용자 화면은 버튼이 두 개뿐이라 스크롤 없이 한 화면에 고정한다
+    if (!devMode) {
+        HomeScreen(
+            gestureCount = gestureCount,
+            sensorsAvailable = vm.sensorsAvailable,
+            onCar = onCar,
+            onGestures = onGestures,
+            onTitleTap = titleTap,
+        )
+        return
+    }
+
     ListScreen {
-        item { Text("제스처 툴", style = MaterialTheme.typography.title3) }
+        item { DevTitle(onTitleTap = titleTap) }
         if (!vm.sensorsAvailable) {
             item { Text("⚠ 가속도·자이로 센서가 없어요", color = Color(0xFFFF8A80), textAlign = TextAlign.Center) }
+        }
+        // ----- 사용자 화면: 로봇카 연결, 내 제스처 (낙상 감지는 연결되면 뒤에서 돌고, 감지되면 팝업만 뜬다) -----
+        item {
+            Chip(
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("🚗 로봇카 연결") },
+                secondaryLabel = { Text(DemoState.connectionSummary()) },
+                onClick = onCar,
+            )
+        }
+        item {
+            Chip(
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("✋ 내 제스처") },
+                secondaryLabel = { Text("${gestureCount}개 등록됨") },
+                onClick = onGestures,
+                enabled = vm.sensorsAvailable,
+            )
+        }
+        // ----- 개발자 모드 -----
+        item { Text("개발자 모드", style = MaterialTheme.typography.caption2, color = Color.Gray) }
+        item {
+            Chip(
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("🆘 낙상 감지 데모") },
+                secondaryLabel = { Text("켜고 끄기 · 낙상 테스트") },
+                onClick = onFall,
+                colors = ChipDefaults.secondaryChipColors(),
+            )
         }
         item {
             Chip(
@@ -129,6 +242,7 @@ fun MenuScreen(
                 colors = ChipDefaults.secondaryChipColors(),
             )
         }
+        item { CompactChip(onClick = onExitDevMode, label = { Text("개발자 모드 끄기") }) }
     }
 }
 

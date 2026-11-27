@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- 워치 전용 앱 -->
     <uses-feature android:name="android.hardware.type.watch" />
@@ -13,6 +14,18 @@
     <uses-permission android:name="android.permission.BODY_SENSORS" />
     <!-- 가속도·자이로는 200Hz로 읽는다. 200Hz까지는 HIGH_SAMPLING_RATE_SENSORS 권한이 필요 없다 -->
 
+    <!-- 데모: 앱이 백그라운드에 있어도 센서를 읽고 로봇카와 연결을 유지한다 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- 낙상 의심 때 화면이 꺼져 있어도 "괜찮으세요?" 팝업을 바로 띄우기 -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- health 종류 포그라운드 서비스는 BODY_SENSORS 또는 이 권한이 있어야 시작된다.
+         이 권한은 설치할 때 자동으로 받아져서, 신체 센서 권한을 거절해도 서비스가 뜬다. -->
+    <uses-permission
+        android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS"
+        tools:ignore="HighSamplingRate" />
 
     <application
         android:allowBackup="false"
@@ -35,5 +48,32 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- 데모: 백그라운드 제스처·낙상 감지 (로봇카 통신은 폰이 한다).
+             센서를 계속 읽으므로 health 종류의 포그라운드 서비스다 (BODY_SENSORS 권한 필요) -->
+        <service
+            android:name=".demo.WatchOutService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
+
+        <!-- 데모: 폰이 보낸 로봇카 연결 상태·낙상 확인 결과·제스처 등록 조작을 받는다 (Wear OS Data Layer) -->
+        <service
+            android:name=".demo.PhoneLinkListener"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/watchout/status"
+                    android:scheme="wear" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/watchout/msg"
+                    android:scheme="wear" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>
