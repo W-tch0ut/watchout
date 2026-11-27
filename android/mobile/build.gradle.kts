@@ -1,5 +1,6 @@
 // 폰 앱 (#49): Firebase 로그인(구글, 이메일·비밀번호) + 보호자 연락처 등록·수정.
-// 다음 단계(#50): 응급 알림(FCM) 받기, 상태 보기.
+// #50: 환자↔보호자 초대 코드 연결, 응급 알림 목록(사진·움직임·확인), 보호자 번호로 문자, 119 시뮬레이션.
+// 다음 단계: 앱이 꺼져 있어도 오는 푸시(FCM).
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)

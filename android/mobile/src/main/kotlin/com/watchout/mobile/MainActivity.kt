@@ -13,6 +13,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.watchout.mobile.alert.TestPhoto
 import com.watchout.mobile.auth.LoginViewModel
 import com.watchout.mobile.car.CarViewModel
 import com.watchout.mobile.gesture.GestureViewModel
@@ -22,7 +23,9 @@ import com.watchout.mobile.ui.CarScreen
 import com.watchout.mobile.ui.PatientHome
 import com.watchout.mobile.ui.PatientTab
 import com.watchout.mobile.ui.SmsScreen
+import com.watchout.mobile.family.GuardianHomeViewModel
 import com.watchout.mobile.guardian.GuardianViewModel
+import com.watchout.mobile.patient.PatientViewModel
 import com.watchout.mobile.profile.RoleViewModel
 import com.watchout.mobile.profile.UserRole
 import com.watchout.mobile.ui.GuardianHomeScreen
@@ -38,8 +41,9 @@ import kotlinx.coroutines.launch
  * 로그인 상태를 보고 어떤 화면을 그릴지 정한다.
  *   로그아웃 상태          → LoginScreen
  *   로그인, 모드 안 고름   → RoleSelectScreen (본인 / 보호자)
- *   본인(환자) 모드        → PatientHome 탭: CarScreen(로봇카·워치 연결) / GuardianScreen(보호자 연락처) / SmsScreen(응급 문자)
- *   보호자 모드            → GuardianHomeScreen (연결된 가족·알림 자리, #50)
+ *   본인(환자) 모드        → PatientHome 탭: CarScreen(로봇카 연결, #42) / GestureScreen(내 제스처, #42)
+ *                            / GuardianScreen(보호자 연락처 + 초대·응급 알림, #49·#50) / SmsScreen(응급 문자 내용, #42)
+ *   보호자 모드            → GuardianHomeScreen (연결된 가족·받은 알림, #50)
  * 로그인·로그아웃하면 currentUser가 바뀌고, 화면이 자동으로 바뀐다.
  */
 class MainActivity : ComponentActivity() {
@@ -97,12 +101,24 @@ class MainActivity : ComponentActivity() {
                             onCancel = roleVm::cancelChange,
                             onSignOut = onSignOut,
                         )
-                        roleState.role == UserRole.GUARDIAN -> GuardianHomeScreen(
-                            user = current,
-                            onChangeMode = roleVm::startChange,
-                            onSignOut = onSignOut,
-                        )
-                        else -> PatientHome { tab -> // 본인(환자) 모드: 로봇카 / 보호자 연락처 / 응급 문자
+                        roleState.role == UserRole.GUARDIAN -> { // 보호자 모드: 연결된 가족·받은 알림
+                            val homeVm: GuardianHomeViewModel = viewModel(
+                                key = "home:$sessionKey",
+                                factory = GuardianHomeViewModel.factory(
+                                    uid = current.uid,
+                                    guardianName = current.shownName,
+                                    linkRepo = container.linkRepository,
+                                    alertRepo = container.alertRepository,
+                                ),
+                            )
+                            GuardianHomeScreen(
+                                vm = homeVm,
+                                user = current,
+                                onChangeMode = roleVm::startChange,
+                                onSignOut = onSignOut,
+                            )
+                        }
+                        else -> PatientHome { tab -> // 본인(환자) 모드: 로봇카 / 제스처 / 보호자 / 문자
                             when (tab) {
                                 PatientTab.CAR -> CarScreen(
                                     vm = viewModel(
@@ -123,15 +139,30 @@ class MainActivity : ComponentActivity() {
                                     onChangeMode = roleVm::startChange,
                                     onSignOut = onSignOut,
                                 )
-                                PatientTab.GUARDIANS -> GuardianScreen(
-                                    vm = viewModel<GuardianViewModel>(
+                                PatientTab.GUARDIANS -> { // 보호자 연락처 등록 + 초대·응급 알림 (#49·#50)
+                                    val vm: GuardianViewModel = viewModel(
                                         key = "guardians:$sessionKey",
                                         factory = GuardianViewModel.factory(current.uid, container.guardianRepository),
-                                    ),
-                                    user = current,
-                                    onChangeMode = roleVm::startChange,
-                                    onSignOut = onSignOut,
-                                )
+                                    )
+                                    val patientVm: PatientViewModel = viewModel(
+                                        key = "patient:$sessionKey",
+                                        factory = PatientViewModel.factory(
+                                            uid = current.uid,
+                                            patientName = current.shownName,
+                                            linkRepo = container.linkRepository,
+                                            alertRepo = container.alertRepository,
+                                            sms = container.smsSender,
+                                            testPhoto = TestPhoto::create,
+                                        ),
+                                    )
+                                    GuardianScreen(
+                                        vm = vm,
+                                        patientVm = patientVm,
+                                        user = current,
+                                        onChangeMode = roleVm::startChange,
+                                        onSignOut = onSignOut,
+                                    )
+                                }
                                 PatientTab.SMS -> SmsScreen(
                                     vm = viewModel(key = "sms", factory = SmsViewModel.factory(container.smsSettingsStore)),
                                     user = current,

@@ -1,0 +1,245 @@
+' 폰 앱 (:mobile 모듈) — 보호자 연결·응급 알림·문자 (#50)
+' 1) 클래스 구조  2) 초대 코드로 연결하는 흐름  3) 테스트 응급 알림 흐름
+' 로그인·연락처는 mobile-login.puml, 모드 선택은 mobile-app-mode.puml 참고
+
+@startuml mobile-guardian-classes
+title 보호자 연결·응급 알림 — 클래스 구조
+skinparam classAttributeIconSize 0
+
+package "com.watchout.mobile.link" {
+    class InviteCode <<object>> {
+        + LENGTH: Int
+        + VALID_MINUTES: Long
+        + generate(random: Random): String
+        + normalize(raw: String): String?
+        + isExpired(createdAtMillis: Long?, nowMillis: Long): Boolean
+    }
+    class LinkedPatient {
+        + uid: String
+        + name: String
+    }
+    class LinkedGuardian {
+        + guardianUid: String
+        + guardianId: String
+        + guardianName: String
+    }
+    enum LinkError {
+        INVALID_CODE
+        NOT_FOUND
+        EXPIRED
+        SELF
+        ...
+        + message: String
+    }
+    interface LinkRepository {
+        + createInvite(patientUid: String, patientName: String, guardianId: String): String
+        + observeLinkedGuardians(patientUid: String): Flow<List<LinkedGuardian>>
+        + removeGuardianLink(patientUid: String, guardianUid: String): Unit
+        + acceptInvite(code: String, guardianUid: String, guardianName: String): LinkedPatient
+        + observePatients(guardianUid: String): Flow<List<LinkedPatient>>
+        + leavePatient(guardianUid: String, patientUid: String): Unit
+    }
+    class FirestoreLinkRepository {
+        - db: FirebaseFirestore
+    }
+}
+
+package "com.watchout.mobile.alert" {
+    class EmergencyAlert {
+        + id: String
+        + patientUid: String
+        + createdAtMillis: Long?
+        + moving: Boolean
+        + source: AlertSource
+        + photo: AlertPhoto?
+        + ackedByName: String?
+        + isAcknowledged: Boolean
+    }
+    class NewAlert {
+        + moving: Boolean
+        + source: AlertSource
+        + photo: AlertPhoto?
+    }
+    class AlertPhoto {
+        + jpeg: ByteArray
+        + {static} MAX_BYTES: Int
+    }
+    enum AlertSource {
+        TEST
+        ROBOT
+    }
+    interface AlertRepository {
+        + observe(patientUid: String): Flow<List<EmergencyAlert>>
+        + create(patientUid: String, alert: NewAlert): String
+        + acknowledge(patientUid: String, alertId: String, guardianUid: String, guardianName: String): Unit
+    }
+    class FirestoreAlertRepository {
+        - db: FirebaseFirestore
+    }
+    class AlertFormat <<object>> {
+        + time(millis: Long?, zone: ZoneId): String
+        + moving(moving: Boolean): String
+    }
+    class TestPhoto <<object>> {
+        + create(): AlertPhoto
+    }
+}
+
+package "com.watchout.mobile.sms" {
+    interface SmsSender {
+        + canSend(): Boolean
+        + send(phone: String, text: String): Unit
+    }
+    class AndroidSmsSender {
+        - appContext: Context
+    }
+    class SmsMessages <<object>> {
+        + isMobileNumber(phone: String): Boolean
+        + invite(patientName: String, code: String): String
+        + emergency(patientName: String, moving: Boolean, timeMillis: Long?, isTest: Boolean): String
+    }
+}
+
+package "com.watchout.mobile.patient" {
+    class PatientViewModel {
+        - uid: String
+        - patientName: String
+        - linkRepo: LinkRepository
+        - alertRepo: AlertRepository
+        - sms: SmsSender
+        - testPhoto: () -> AlertPhoto?
+        + state: StateFlow<PatientUiState>
+        + sendInvite(guardian: Guardian): Unit
+        + sendTestEmergency(guardians: List<Guardian>, moving: Boolean): Unit
+        + unlink(guardianId: String): Unit
+    }
+    class PatientUiState {
+        + linkedGuardians: List<LinkedGuardian>
+        + invitingId: String?
+        + invite: InviteResult?
+        + isSendingEmergency: Boolean
+        + emergency: EmergencyResult?
+        + errorMessage: String?
+        + isLinked(guardianId: String?): Boolean
+    }
+    class InviteResult {
+        + guardianName: String
+        + code: String
+        + smsSent: Boolean
+    }
+    class EmergencyResult {
+        + alertSaved: Boolean
+        + smsSent: Int
+        + smsFailed: Int
+        + noSmsPermission: Boolean
+    }
+}
+
+package "com.watchout.mobile.family" {
+    class GuardianHomeViewModel {
+        - uid: String
+        - guardianName: String
+        - linkRepo: LinkRepository
+        - alertRepo: AlertRepository
+        + state: StateFlow<GuardianHomeUiState>
+        + openCodeDialog(): Unit
+        + onCodeChange(v: String): Unit
+        + submitCode(): Unit
+        + acknowledge(item: FamilyAlert): Unit
+        + leave(patient: LinkedPatient): Unit
+    }
+    class GuardianHomeUiState {
+        + patients: List<LinkedPatient>
+        + disconnected: Set<String>
+        + alerts: List<FamilyAlert>
+        + acking: Set<String>
+        + codeInput: String
+        + codeError: LinkError?
+        + unacknowledgedCount: Int
+    }
+    class FamilyAlert {
+        + patientName: String
+        + alert: EmergencyAlert
+    }
+}
+
+package "com.watchout.mobile.ui" {
+    class GuardianScreen <<Composable>> {
+        + GuardianScreen(vm: GuardianViewModel, patientVm: PatientViewModel, user: AppUser, ...): Unit
+    }
+    class GuardianHomeScreen <<Composable>> {
+        + GuardianHomeScreen(vm: GuardianHomeViewModel, user: AppUser, ...): Unit
+    }
+}
+
+LinkRepository <|.. FirestoreLinkRepository
+AlertRepository <|.. FirestoreAlertRepository
+SmsSender <|.. AndroidSmsSender
+AlertPhoto <-- EmergencyAlert
+AlertSource <-- EmergencyAlert
+
+PatientViewModel o-- LinkRepository
+PatientViewModel o-- AlertRepository
+PatientViewModel o-- SmsSender
+PatientViewModel *-- PatientUiState
+PatientViewModel --> SmsMessages
+PatientUiState --> InviteResult
+PatientUiState --> EmergencyResult
+
+GuardianHomeViewModel o-- LinkRepository
+GuardianHomeViewModel o-- AlertRepository
+GuardianHomeViewModel *-- GuardianHomeUiState
+GuardianHomeUiState --> FamilyAlert
+FamilyAlert --> EmergencyAlert
+
+FirestoreLinkRepository --> InviteCode
+AndroidSmsSender --> SmsMessages : 휴대폰 번호만
+GuardianScreen --> PatientViewModel
+GuardianScreen --> TestPhoto
+GuardianHomeScreen --> GuardianHomeViewModel
+@enduml
+
+@startuml mobile-guardian-link-flow
+title 초대 코드로 환자 ↔ 보호자 연결하기
+actor 환자
+participant "환자 폰\nPatientViewModel" as P
+database "Firestore" as DB
+participant "보호자 폰\nGuardianHomeViewModel" as G
+actor 보호자
+
+환자 -> P : 연락처의 [초대 문자]
+P -> DB : 트랜잭션: invites/{6자리} 비었나? → 만들기\n(patientUid, patientName, guardianId, createdAt=서버 시각)
+DB --> P : 코드
+P -> 보호자 : 문자 "[WatchOut] … 코드 123456 (10분 유효)"\n(권한 없으면 화면에 코드만 표시)
+보호자 -> G : 보호자 모드 [초대 코드 입력] 123456
+G -> DB : invites/123456 읽기
+alt 없음 / 10분 지남 / 내 코드
+  G --> 보호자 : 이유 안내 (NOT_FOUND / EXPIRED / SELF)
+else 유효
+  G -> DB : 한 묶음(batch)\n① users/{환자}/links/{보호자} 만들기 (규칙: 유효한 코드가 있어야)\n② users/{보호자}/patients/{환자} 만들기\n③ invites/123456 지우기
+  DB --> G : 성공
+  G --> 보호자 : "홍길동님과 연결됐어요"
+  DB --> P : links 실시간 → 연락처에 "✅ 보호자 앱 연결됨"
+end
+@enduml
+
+@startuml mobile-guardian-emergency-flow
+title [테스트 응급 알림] — 앱 알림 + 실제 문자 + 119 시뮬레이션
+actor 환자
+participant "환자 폰\nPatientViewModel" as P
+database "Firestore\nusers/{환자}/alerts" as DB
+participant "보호자 폰\nGuardianHomeViewModel" as G
+actor 보호자
+
+환자 -> P : [테스트 응급 알림 보내기] → 확인 창 [보내기]
+note right of P : 나중에는 로봇카가 워치 충격 + 카메라로\n쓰러짐을 "확정"했을 때만 이 단계가 시작된다
+P -> DB : 알림 만들기 (source=test, moving, call119=simulated, 사진 ≤ 500KB)
+P -> 보호자 : 등록된 보호자 번호마다 실제 문자\n"[WatchOut 테스트] 홍길동님 쓰러짐 확인 (움직임 없음) …"
+note right of P : 알림 저장이 실패해도 문자는 따로 보낸다\n119 번호로는 보내지 않는다 (휴대폰 번호만)
+P --> 환자 : 결과 창: 앱 알림 ✓, 문자 n명, 🚑 119 연락 (시뮬레이션)
+DB --> G : 연결된 보호자에게만 실시간 전달 (보안 규칙)
+G --> 보호자 : 받은 알림: 시각 · 쓰러짐 · 움직임 · 사진 · [확인했어요]
+보호자 -> G : [확인했어요]
+G -> DB : ackedBy, ackedByName, ackedAt (처음 한 번만)
+DB --> G : (다른 보호자 화면에도) "김딸님이 확인했어요"
+@enduml
