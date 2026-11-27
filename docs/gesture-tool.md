@@ -16,7 +16,10 @@ cd android
 
 - Android Studio에서는 `android/` 폴더를 열면 된다.
 - 명령줄로 빌드하려면 `android/local.properties`에 SDK 위치가 필요하다. 이 파일은 커밋하지 않는다.
-  예) `sdk.dir=C\:/Users/<사용자>/AppData/Local/Android/Sdk`
+  예) `sdk.dir=C\:/Android/Sdk`
+- ⚠️ Claude 데스크톱 앱(Microsoft Store 버전)이 SDK를 설치하면 `AppData\Local` 아래 경로가
+  앱 전용 폴더(`AppData\Local\Packages\Claude_...\LocalCache\...`)로 숨겨져 다른 터미널에서 보이지 않는다.
+  SDK는 `C:\Android\Sdk`처럼 `AppData` 밖에 둔다.
 
 ## 2. 갤럭시 워치에 설치 (무선 디버깅)
 
@@ -30,7 +33,7 @@ adb connect 192.168.0.23:5555    # 무선 디버깅 화면의 IP:포트
 cd android; .\gradlew :wear:installDebug
 ```
 
-`adb`는 `%LOCALAPPDATA%\Android\Sdk\platform-tools\adb.exe`에 있다.
+`adb`는 SDK 폴더의 `platform-tools\adb.exe`에 있다. (예: `C:\Android\Sdk\platform-tools\adb.exe`)
 
 ## 3. 사용법
 
