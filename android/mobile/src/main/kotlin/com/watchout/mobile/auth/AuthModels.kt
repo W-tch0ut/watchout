@@ -5,7 +5,16 @@ data class AppUser(
     val uid: String,
     val email: String?,
     val displayName: String?,
-)
+) {
+    /**
+     * 문자와 상대방 화면에 보일 이름 (#50).
+     * 구글 계정 이름이 있으면 그 이름, 없으면(이메일 가입) 이메일 @ 앞부분.
+     */
+    val shownName: String
+        get() = displayName?.trim()?.takeIf { it.isNotEmpty() }
+            ?: email?.substringBefore('@')?.takeIf { it.isNotEmpty() }
+            ?: "가족"
+}
 
 /** 로그인 중에 생길 수 있는 문제. 화면에는 [message]로 한국어 안내를 보여준다. */
 enum class AuthError(val message: String) {

@@ -13,8 +13,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.watchout.mobile.alert.TestPhoto
 import com.watchout.mobile.auth.LoginViewModel
+import com.watchout.mobile.family.GuardianHomeViewModel
 import com.watchout.mobile.guardian.GuardianViewModel
+import com.watchout.mobile.patient.PatientViewModel
 import com.watchout.mobile.profile.RoleViewModel
 import com.watchout.mobile.profile.UserRole
 import com.watchout.mobile.ui.GuardianHomeScreen
@@ -31,7 +34,7 @@ import kotlinx.coroutines.launch
  *   로그아웃 상태          → LoginScreen
  *   로그인, 모드 안 고름   → RoleSelectScreen (본인 / 보호자)
  *   본인(환자) 모드        → GuardianScreen (보호자 연락처 등록)
- *   보호자 모드            → GuardianHomeScreen (연결된 가족·알림 자리, #50)
+ *   보호자 모드            → GuardianHomeScreen (연결된 가족·받은 알림, #50)
  * 로그인·로그아웃하면 currentUser가 바뀌고, 화면이 자동으로 바뀐다.
  */
 class MainActivity : ComponentActivity() {
@@ -89,18 +92,42 @@ class MainActivity : ComponentActivity() {
                             onCancel = roleVm::cancelChange,
                             onSignOut = onSignOut,
                         )
-                        roleState.role == UserRole.GUARDIAN -> GuardianHomeScreen(
-                            user = current,
-                            onChangeMode = roleVm::startChange,
-                            onSignOut = onSignOut,
-                        )
-                        else -> { // 본인(환자) 모드: 보호자 연락처 등록
+                        roleState.role == UserRole.GUARDIAN -> { // 보호자 모드: 연결된 가족·받은 알림
+                            val homeVm: GuardianHomeViewModel = viewModel(
+                                key = "home:$sessionKey",
+                                factory = GuardianHomeViewModel.factory(
+                                    uid = current.uid,
+                                    guardianName = current.shownName,
+                                    linkRepo = container.linkRepository,
+                                    alertRepo = container.alertRepository,
+                                ),
+                            )
+                            GuardianHomeScreen(
+                                vm = homeVm,
+                                user = current,
+                                onChangeMode = roleVm::startChange,
+                                onSignOut = onSignOut,
+                            )
+                        }
+                        else -> { // 본인(환자) 모드: 보호자 연락처 등록 + 초대·응급 알림
                             val vm: GuardianViewModel = viewModel(
                                 key = "guardians:$sessionKey",
                                 factory = GuardianViewModel.factory(current.uid, container.guardianRepository),
                             )
+                            val patientVm: PatientViewModel = viewModel(
+                                key = "patient:$sessionKey",
+                                factory = PatientViewModel.factory(
+                                    uid = current.uid,
+                                    patientName = current.shownName,
+                                    linkRepo = container.linkRepository,
+                                    alertRepo = container.alertRepository,
+                                    sms = container.smsSender,
+                                    testPhoto = TestPhoto::create,
+                                ),
+                            )
                             GuardianScreen(
                                 vm = vm,
+                                patientVm = patientVm,
                                 user = current,
                                 onChangeMode = roleVm::startChange,
                                 onSignOut = onSignOut,

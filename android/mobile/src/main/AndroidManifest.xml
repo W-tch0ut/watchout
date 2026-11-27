@@ -6,6 +6,14 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!--
+        보호자 번호로 초대 코드·응급 문자 보내기 (#50). 화면에서 버튼을 누를 때 한 번 물어본다.
+        119로는 보내지 않는다 (시뮬레이션만).
+    -->
+    <uses-permission android:name="android.permission.SEND_SMS" />
+    <!-- 유심이 없는 기기(태블릿 등)에도 설치는 되게 한다. 그런 기기에서는 문자 없이 앱 알림만 간다. -->
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
+
+    <!--
         로그인 정보(Firebase 세션)와 앱 데이터가 구글 드라이브 백업이나 다른 기기로 복사되지 않게 막는다.
         allowBackup="false": Android 11 이하 / dataExtractionRules: Android 12 이상
         (Android 11 이하는 allowBackup="false"로 이미 백업이 꺼져서 fullBackupContent가 필요 없다 → lint 경고 무시)
