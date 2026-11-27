@@ -1,0 +1,12 @@
+{
+  "user": {
+    "name": "홍길동",
+    "address": "서울시 ○○구 ○○동 (예시 주소)",
+    "note": "고혈압 약 복용 중 (예시)"
+  },
+  "guardians": [
+    { "name": "보호자", "phone": "010-0000-0000" }
+  ],
+  "emergency_number": "119",
+  "sms_sender": ""
+}

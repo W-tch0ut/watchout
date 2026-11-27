@@ -27,3 +27,7 @@ captures/
 *.aab
 *.jks
 *.keystore
+
+# 데모 로봇카: 개인정보가 든 설정, 보낸 문자·사진
+demo/config.json
+demo/outbox/
