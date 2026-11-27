@@ -71,7 +71,7 @@ private fun ListScreen(content: ScalingLazyListScope.() -> Unit) {
 
 /** 화면이 보이는 동안 화면이 꺼지지 않게 한다. 제스처를 하는 동안 화면이 꺼지면 센서가 멈춘다. */
 @Composable
-private fun KeepScreenOn() {
+internal fun KeepScreenOn() {
     val view = LocalView.current
     DisposableEffect(view) {
         view.keepScreenOn = true
@@ -85,6 +85,7 @@ fun MenuScreen(
     onRecognize: () -> Unit,
     onCollect: () -> Unit,
     onSamsungCollect: () -> Unit,
+    onVoice: () -> Unit,
 ) {
     ListScreen {
         item { Text("제스처 툴", style = MaterialTheme.typography.title3) }
@@ -98,6 +99,14 @@ fun MenuScreen(
                 secondaryLabel = { Text("제스처를 하면 이름을 알려줘요") },
                 onClick = onRecognize,
                 enabled = vm.sensorsAvailable,
+            )
+        }
+        item {
+            Chip(
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("음성 명령") },
+                secondaryLabel = { Text("누른 채로 \"이리 와\"") },
+                onClick = onVoice,
             )
         }
         item {

@@ -11,6 +11,18 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- 삼성 제스처 수집: 심박 원시 신호(PPG)를 읽는다. 처음 쓸 때 사용자에게 허용을 묻는다 -->
     <uses-permission android:name="android.permission.BODY_SENSORS" />
+    <!-- 음성 명령(#69): 버튼을 누르는 동안만 마이크를 쓴다. 처음 쓸 때 사용자에게 허용을 묻는다.
+         인식은 기기 안에서만 하고, 녹음은 저장하거나 밖으로 보내지 않는다. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- 마이크가 없는 워치에도 설치는 되게 한다(음성 화면만 못 쓴다) -->
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
+    <!-- Android 11+ 에서 음성 인식 서비스를 찾으려면 이 선언이 있어야 한다 -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
     <!-- 가속도·자이로는 200Hz로 읽는다. 200Hz까지는 HIGH_SAMPLING_RATE_SENSORS 권한이 필요 없다 -->
 
 

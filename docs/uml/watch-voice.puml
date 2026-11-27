@@ -1,0 +1,161 @@
+' 워치 음성 명령 (#69) — :command 모듈(순수 Kotlin)과 :wear 음성 화면의 클래스 구조, 말하기 흐름
+@startuml
+skinparam classAttributeIconSize 0
+title 워치 음성 명령 — 클래스 구조
+
+package "com.watchout.command (:command, 순수 Kotlin)" {
+    interface RobotCommand <<sealed>> {
+        + toJson(): String
+    }
+    class Stop <<object>>
+    class Approach <<object>>
+    class Follow <<object>>
+    class Grab <<data>> {
+        + target: GrabTarget
+    }
+    class Turn <<data>> {
+        + angleDeg: Int
+    }
+    class Move <<data>> {
+        + distCm: Int
+    }
+    enum GrabTarget {
+        PHONE
+        MEDICINE
+        REMOTE
+        GLASSES
+        CUP
+        + id: String
+        + label: String
+        + words: List<String>
+    }
+    interface CommandSender <<fun>> {
+        + send(command: RobotCommand): Unit
+    }
+
+    interface VoiceResult <<sealed>>
+    class Understood <<data>> {
+        + command: RobotCommand
+    }
+    class AskTarget <<object>>
+    class NotUnderstood <<object>>
+
+    class VoiceCommandParser <<object>> {
+        - TARGET_WORDS: List<Pair<String, GrabTarget>>
+        + normalize(text: String): String
+        + isStop(text: String): Boolean
+        + findTarget(text: String): GrabTarget?
+        + parse(text: String): VoiceResult
+    }
+
+    class VoiceConversation {
+        + awaitingTarget: Boolean
+        - stopSentThisTurn: Boolean
+        + startTurn(): Unit
+        + onPartial(text: String): RobotCommand?
+        + onFinal(candidates: List<String>): VoiceResult?
+        + reset(): Unit
+    }
+}
+
+package "com.watchout.wear (:wear)" {
+    class VoiceScreen <<Composable>> {
+        - TalkButton(listening: Boolean, onPress: () -> Boolean, onRelease: () -> Unit)
+    }
+    class VoiceViewModel {
+        - speech: OnDeviceSpeechInput
+        - conversation: VoiceConversation
+        - sender: CommandSender
+        + state: VoiceUiState
+        + lastCommandJson: String?
+        + startListening(): Unit
+        + finishListening(): Unit
+        + leave(): Unit
+    }
+    interface VoiceUiState <<sealed>>
+    class OnDeviceSpeechInput {
+        - recognizer: SpeechRecognizer?
+        + isAvailable: Boolean
+        + start(listener: Listener): Unit
+        + finish(): Unit
+        + cancel(): Unit
+        + release(): Unit
+    }
+    interface "OnDeviceSpeechInput.Listener" as Listener {
+        + onPartial(candidates: List<String>): Unit
+        + onFinal(candidates: List<String>): Unit
+        + onError(code: Int): Unit
+    }
+    class LogCommandSender {
+        + send(command: RobotCommand): Unit
+    }
+}
+
+RobotCommand <|.. Stop
+RobotCommand <|.. Approach
+RobotCommand <|.. Follow
+RobotCommand <|.. Grab
+RobotCommand <|.. Turn
+RobotCommand <|.. Move
+Grab --> GrabTarget
+VoiceResult <|.. Understood
+VoiceResult <|.. AskTarget
+VoiceResult <|.. NotUnderstood
+Understood --> RobotCommand
+VoiceCommandParser --> VoiceResult
+VoiceConversation --> VoiceCommandParser
+
+CommandSender <|.. LogCommandSender
+VoiceScreen --> VoiceViewModel
+VoiceViewModel *-- OnDeviceSpeechInput
+VoiceViewModel *-- VoiceConversation
+VoiceViewModel o-- CommandSender
+VoiceViewModel --> VoiceUiState
+OnDeviceSpeechInput --> Listener
+note bottom of LogCommandSender : 임시 구현. #42 통신이 정해지면\nMQTT/BLE 구현으로 바꿔 끼운다.
+@enduml
+
+@startuml
+title 누른 채로 말하기 — "이리 와 … 멈춰"
+actor 사용자
+participant VoiceScreen as UI
+participant VoiceViewModel as VM
+participant OnDeviceSpeechInput as SR
+participant VoiceConversation as C
+participant CommandSender as S
+
+사용자 -> UI : 버튼 누름
+UI -> VM : startListening()
+VM -> C : startTurn()
+VM -> SR : start(listener)
+note right of SR : 기기 안 인식만 사용\n(없으면 Unavailable 화면, 클라우드 X)
+loop 말하는 동안
+    SR -> VM : onPartial(["이리 와 멈춰"])
+    VM -> C : onPartial(text)
+    alt 멈춤 낱말이 처음 들림
+        C --> VM : Stop
+        VM -> S : send(Stop) — 문장이 끝나기 전에 바로
+    else 그 밖
+        C --> VM : null
+    end
+end
+사용자 -> UI : 손 뗌
+UI -> VM : finishListening()
+VM -> SR : finish()
+SR -> VM : onFinal(후보들)
+VM -> C : onFinal(후보들)
+alt 이미 stop을 보냄
+    C --> VM : null (다시 안 보냄)
+else 알아들음
+    C --> VM : Understood(command)
+    VM -> S : send(command)
+    VM -> 사용자 : 진동 한 번
+else 물건 이름 없음 ("가져다줘")
+    C --> VM : AskTarget
+    VM -> 사용자 : "어떤 물건?" 안내
+    note right of C : 다음 한 마디에서\n물건 이름만 받는다
+else 못 알아들음
+    C --> VM : NotUnderstood
+    VM -> 사용자 : 짧은 진동 두 번 + 안내 (명령 안 보냄)
+end
+@enduml
