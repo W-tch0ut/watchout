@@ -172,7 +172,9 @@ git push -u origin feature/#12-gesture-register
 - 구조를 바꾼 PR은 본문에 갱신한 다이어그램 파일(`docs/uml/...puml`)을 적는다.
 - **merge는 PM(리포 관리자)만 한다.** PM이 PR 내용을 확인하고 merge하는 것이 최종 승인이다. 팀원끼리 서로 PR을 읽고 Approve·댓글을 남기는 것은 권장한다.
 - merge한 브랜치는 삭제한다 (merge 직후 **Delete branch** 버튼).
-- `main`은 GitHub 브랜치 보호로 다음이 강제된다: PR로만 merge, CI(`Python lint & test`) 통과 필수, PM만 merge 가능, 강제 덮어쓰기(force push)·삭제 금지. 관리자도 예외 없이 적용된다.
+- `main`과 `dev`는 GitHub 브랜치 보호로 다음이 강제된다: PR로만 merge, CI(`Python lint & test`) 통과 필수, PM만 merge 가능, 강제 덮어쓰기(force push)·삭제 금지. 관리자도 예외 없이 적용된다.
+- Android CI(`Android test & lint`)는 Android 코드가 `dev`에 처음 merge될 때 필수 조건에 추가한다 (#30). 그 전에 추가하면 검사가 실행되지 않아 모든 PR의 merge가 막힌다.
+- 아직 merge할 단계가 아닌 프로토타입 PR은 **Draft**로 올린다.
 
 ## Claude 작업 규칙
 - 답변과 설명은 한국어로 한다.
