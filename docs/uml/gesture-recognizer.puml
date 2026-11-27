@@ -63,8 +63,10 @@ class MotionSegmenter {
     - gravity: FloatArray?
     - preRoll: ArrayDeque<MotionFrame>
     - active: ArrayList<MotionFrame>
+    + {static} GRAVITY: Float
     + onSample(sample: SensorSample): List<MotionFrame>?
     + reset(): Unit
+    - snapGravityTo(s: SensorSample): Unit
 }
 
 class MotionFrame <<data>> {
@@ -118,7 +120,31 @@ class GestureRecording <<data>> {
     + samples: List<SensorSample>
     + toCsv(): String
     + fileName(): String
+    + {static} fromCsv(text: String): GestureRecording
     + {static} labelFromFileName(name: String): Gesture?
+}
+
+class SessionCsv <<object>> {
+    + {static} HEADER: String
+    + {static} ACC: String
+    + {static} GYRO: String
+    + {static} PPG: String
+    + {static} infoLine(info: Map<String, String>): String
+    + {static} line(epochMs: Long, sensor: String, values: FloatArray): String
+    + {static} appendLine(sb: StringBuilder, epochMs: Long, sensor: String, values: FloatArray): StringBuilder
+}
+
+class ClockConverter {
+    - wallNowMs: Long
+    - elapsedNowNs: Long
+    + toEpochMs(eventTimestampNs: Long): Long
+}
+
+class SampleRateLimiter {
+    - minIntervalMs: Long
+    - lastAcceptedMs: Long?
+    + accept(timestampMs: Long): Boolean
+    + reset(): Unit
 }
 
 GestureRecognizer <|.. RuleBasedGestureRecognizer

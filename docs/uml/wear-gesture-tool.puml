@@ -14,6 +14,7 @@ package "com.watchout.wear" {
         + hand: WearingHand
         + lastResult: GestureResult?
         + history: List<GestureResult>
+        + live: LiveMotion
         + recordPhase: RecordPhase
         + counts: Map<Gesture, Int>
         + toggleHand(): Unit
@@ -23,12 +24,17 @@ package "com.watchout.wear" {
         + leaveRecordScreen(): Unit
         + record(label: Gesture): Unit
         + deleteLatest(label: Gesture): Unit
+        + session: SessionState?
+        + ppgSensorName: String?
+        + startSession(withPpg: Boolean): Unit
+        + stopSession(): Unit
         - onGestureRecognized(result: GestureResult): Unit
     }
 
     class SensorStreamer {
         - sensorManager: SensorManager
         - latestGyro: FloatArray
+        - rateLimiter: SampleRateLimiter
         + isAvailable: Boolean
         + start(onSample: (SensorSample) -> Unit): Boolean
         + stop(): Unit
@@ -43,12 +49,45 @@ package "com.watchout.wear" {
     }
 
     interface RecordPhase <<sealed>>
+
+    class LiveMotion <<data>> {
+        + gyro: Float
+        + accelOffGravity: Float
+        + samples: Int
+    }
+
+    class ContinuousRecorder {
+        - sensorManager: SensorManager
+        - thread: HandlerThread?
+        - writer: BufferedWriter?
+        - clock: ClockConverter?
+        + ppgSensor: Sensor?
+        + directory: File
+        + counts: AtomicIntegerArray
+        + currentFile: File?
+        + start(hand: WearingHand, withPpg: Boolean): File?
+        + stop(): Unit
+        + onSensorChanged(event: SensorEvent): Unit
+    }
+
+
+    class SessionState <<data>> {
+        + fileName: String
+        + elapsedSec: Int
+        + acc: Int
+        + gyro: Int
+        + ppg: Int
+        + ppgOn: Boolean
+    }
 }
 
 package "com.watchout.gesture (:gesture)" {
     interface GestureRecognizer
     class RuleBasedGestureRecognizer
     class GestureRecording
+    class SampleRateLimiter
+    class SessionCsv
+    class ClockConverter
 }
 
 MainActivity --> GestureToolViewModel
@@ -56,8 +95,14 @@ GestureToolViewModel *-- SensorStreamer
 GestureToolViewModel *-- RecordingStore
 GestureToolViewModel *-- RuleBasedGestureRecognizer
 GestureToolViewModel --> RecordPhase
+GestureToolViewModel --> LiveMotion
 GestureRecognizer <|.. RuleBasedGestureRecognizer
 RecordingStore --> GestureRecording
+SensorStreamer *-- SampleRateLimiter
+GestureToolViewModel *-- ContinuousRecorder
+GestureToolViewModel --> SessionState
+ContinuousRecorder --> SessionCsv
+ContinuousRecorder *-- ClockConverter
 @enduml
 
 @startuml

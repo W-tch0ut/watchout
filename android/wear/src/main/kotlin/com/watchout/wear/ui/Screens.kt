@@ -35,6 +35,7 @@ import com.watchout.gesture.Gesture
 import com.watchout.gesture.GestureResult
 import com.watchout.gesture.WearingHand
 import com.watchout.wear.GestureToolViewModel
+import com.watchout.wear.LiveMotion
 import com.watchout.wear.RecordPhase
 import java.util.Locale
 
@@ -79,7 +80,12 @@ private fun KeepScreenOn() {
 }
 
 @Composable
-fun MenuScreen(vm: GestureToolViewModel, onRecognize: () -> Unit, onCollect: () -> Unit) {
+fun MenuScreen(
+    vm: GestureToolViewModel,
+    onRecognize: () -> Unit,
+    onCollect: () -> Unit,
+    onSamsungCollect: () -> Unit,
+) {
     ListScreen {
         item { Text("제스처 툴", style = MaterialTheme.typography.title3) }
         if (!vm.sensorsAvailable) {
@@ -107,6 +113,16 @@ fun MenuScreen(vm: GestureToolViewModel, onRecognize: () -> Unit, onCollect: () 
         item {
             Chip(
                 modifier = Modifier.fillMaxWidth(),
+                label = { Text("삼성 제스처 수집") },
+                secondaryLabel = { Text("유니버설 제스처 센서 기록") },
+                onClick = onSamsungCollect,
+                enabled = vm.sensorsAvailable,
+                colors = ChipDefaults.secondaryChipColors(),
+            )
+        }
+        item {
+            Chip(
+                modifier = Modifier.fillMaxWidth(),
                 label = { Text("착용: ${if (vm.hand == WearingHand.LEFT) "왼손" else "오른손"}") },
                 secondaryLabel = { Text("눌러서 바꾸기") },
                 onClick = vm::toggleHand,
@@ -125,6 +141,7 @@ fun RecognizeScreen(vm: GestureToolViewModel) {
     }
     ListScreen {
         item { ResultCard(vm.lastResult) }
+        item { LiveLine(vm.live) }
         if (vm.history.size > 1) {
             item { Text("최근", style = MaterialTheme.typography.caption2, color = Color.Gray) }
             items(vm.history.size - 1) { i ->
@@ -136,6 +153,20 @@ fun RecognizeScreen(vm: GestureToolViewModel) {
             }
         }
     }
+}
+
+/**
+ * 지금 센서 값 한 줄. 동작 시작 기준(회전 1.5, 가속 3.0)을 넘으면 주황색으로 바뀐다.
+ * 숫자가 안 바뀌면 센서가 안 들어오는 것이고, 움직여도 주황색이 안 되면 기준이 너무 높은 것이다.
+ */
+@Composable
+private fun LiveLine(live: LiveMotion) {
+    val moving = live.gyro > 1.5f || live.accelOffGravity > 3.0f
+    Text(
+        String.format(Locale.ROOT, "지금 회전 %.1f · 가속 %.1f · #%d", live.gyro, live.accelOffGravity, live.samples),
+        style = MaterialTheme.typography.caption3,
+        color = if (moving) Color(0xFFFFB74D) else Color.Gray,
+    )
 }
 
 @Composable

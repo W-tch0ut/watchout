@@ -50,6 +50,35 @@ data class GestureRecording(
     companion object {
         const val HEADER = "timestamp_ms,ax,ay,az,gx,gy,gz"
 
+        /**
+         * [toCsv]로 저장한 내용을 다시 읽는다. PC에서 녹화 파일을 분석하거나 학습할 때 쓴다.
+         * 시간은 녹화 시작 기준 상대값이라 [startedAtEpochMs]는 0으로 둔다.
+         */
+        fun fromCsv(text: String): GestureRecording {
+            val lines = text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
+            val info = lines.firstOrNull { it.startsWith("#") }
+                ?.removePrefix("#")?.split(',')
+                ?.associate { it.substringBefore('=').trim() to it.substringAfter('=').trim() }
+                .orEmpty()
+            val samples = lines
+                .filterNot { it.startsWith("#") || it == HEADER }
+                .map { line ->
+                    val v = line.split(',')
+                    SensorSample(
+                        v[0].toLong(),
+                        v[1].toFloat(), v[2].toFloat(), v[3].toFloat(),
+                        v[4].toFloat(), v[5].toFloat(), v[6].toFloat(),
+                    )
+                }
+            return GestureRecording(
+                label = Gesture.fromId(info["label"] ?: Gesture.IDLE.id),
+                hand = WearingHand.valueOf(info["hand"] ?: WearingHand.LEFT.name),
+                startedAtEpochMs = 0,
+                samples = samples,
+                rateHz = info["rate_hz"]?.toIntOrNull() ?: 50,
+            )
+        }
+
         /** 파일 이름에서 라벨을 읽는다. 형식이 다르면 null */
         fun labelFromFileName(name: String): Gesture? {
             val id = name.substringBefore("__", missingDelimiterValue = "")

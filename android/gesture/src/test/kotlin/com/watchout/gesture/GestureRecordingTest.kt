@@ -29,6 +29,17 @@ class GestureRecordingTest {
     }
 
     @Test
+    fun `저장한 CSV를 다시 읽으면 라벨, 손, 센서 값이 같다`() {
+        val back = GestureRecording.fromCsv(recording.toCsv())
+
+        assertEquals(Gesture.PUSH, back.label)
+        assertEquals(WearingHand.RIGHT, back.hand)
+        assertEquals(listOf(0L, 20L), back.samples.map { it.timestampMs })
+        assertEquals(-1.25f, back.samples[1].ax)
+        assertEquals(1f, back.samples[1].gx)
+    }
+
+    @Test
     fun `파일 이름 앞부분으로 라벨을 다시 읽을 수 있다`() {
         val name = recording.fileName()
 

@@ -17,6 +17,7 @@ import com.watchout.gesture.Gesture
 import com.watchout.gesture.GestureRecognizer
 import com.watchout.gesture.GestureRecording
 import com.watchout.gesture.GestureResult
+import com.watchout.gesture.MotionSegmenter
 import com.watchout.gesture.RuleBasedGestureRecognizer
 import com.watchout.gesture.SensorSample
 import com.watchout.gesture.WearingHand
@@ -25,6 +26,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.abs
+import kotlin.math.sqrt
 
 /** 녹화 화면 진행 단계 */
 sealed interface RecordPhase {
@@ -71,6 +74,12 @@ class GestureToolViewModel(app: Application) : AndroidViewModel(app) {
         private set
     val history = mutableStateListOf<GestureResult>()
 
+    /** 지금 센서 값 (화면에 0.1초마다 갱신). 반응이 없을 때 센서가 들어오는지 확인하는 용도 */
+    var live by mutableStateOf(LiveMotion())
+        private set
+    private var lastLiveUpdateMs = 0L
+    private var sampleCount = 0
+
     // 수집 모드 상태
     var recordPhase by mutableStateOf<RecordPhase>(RecordPhase.Ready)
         private set
@@ -90,9 +99,23 @@ class GestureToolViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startRecognizing() {
         recognizer.reset()
+        sampleCount = 0
+        live = LiveMotion()
         streamer.start { sample ->
+            updateLive(sample)
             recognizer.onSample(sample)?.let(::onGestureRecognized)
         }
+    }
+
+    private fun updateLive(s: SensorSample) {
+        sampleCount++
+        if (s.timestampMs - lastLiveUpdateMs < LIVE_INTERVAL_MS) return
+        lastLiveUpdateMs = s.timestampMs
+        live = LiveMotion(
+            gyro = sqrt(s.gx * s.gx + s.gy * s.gy + s.gz * s.gz),
+            accelOffGravity = abs(sqrt(s.ax * s.ax + s.ay * s.ay + s.az * s.az) - MotionSegmenter.GRAVITY),
+            samples = sampleCount,
+        )
     }
 
     fun stopRecognizing() = streamer.stop()
@@ -159,8 +182,50 @@ class GestureToolViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    // ---------- 삼성 제스처 수집 (연속 기록) ----------
+
+    private val recorder = ContinuousRecorder(app)
+    val ppgSensorName: String? = recorder.ppgSensor?.name
+    val sessionPath: String = recorder.directory.absolutePath
+
+    var session by mutableStateOf<SessionState?>(null)
+        private set
+    private var sessionJob: Job? = null
+
+    /** @param withPpg 신체 센서 권한을 받았으면 true */
+    fun startSession(withPpg: Boolean) {
+        if (session != null) return
+        val file = recorder.start(hand, withPpg && ppgSensorName != null) ?: return
+        val startedAt = System.currentTimeMillis()
+        val ppgOn = withPpg && ppgSensorName != null
+        session = SessionState(file.name, 0, 0, 0, 0, ppgOn)
+        sessionJob = viewModelScope.launch {
+            while (true) {
+                // 1초마다 갱신. 화면 글자가 바뀔 때마다 유니버설 제스처(접근성 서비스)도 화면을 다시 읽어서
+                // 너무 자주 바꾸면 워치 전체가 느려진다.
+                delay(1000)
+                session = SessionState(
+                    fileName = file.name,
+                    elapsedSec = ((System.currentTimeMillis() - startedAt) / 1000).toInt(),
+                    acc = recorder.counts.get(0),
+                    gyro = recorder.counts.get(1),
+                    ppg = recorder.counts.get(2),
+                    ppgOn = ppgOn,
+                )
+            }
+        }
+    }
+
+    fun stopSession() {
+        sessionJob?.cancel()
+        sessionJob = null
+        recorder.stop()
+        session = null
+    }
+
     override fun onCleared() {
         streamer.stop()
+        stopSession()
     }
 
     private fun vibrate(ms: Long) {
@@ -173,5 +238,24 @@ class GestureToolViewModel(app: Application) : AndroidViewModel(app) {
         private const val COUNTDOWN_SECONDS = 3
         private const val RECORD_MS = 2500L
         private const val MIN_SAMPLES = 50 // 2.5초 × 50Hz = 125개가 정상
+        private const val LIVE_INTERVAL_MS = 100L
     }
 }
+
+/**
+ * 화면에 보여줄 지금 움직임.
+ * @property gyro 회전 속도 크기 (rad/s). 1.5를 넘으면 동작 시작으로 본다.
+ * @property accelOffGravity 가속도 크기가 중력(9.81)에서 벗어난 정도 (m/s²)
+ * @property samples 인식 시작 후 받은 센서 값 개수. 늘지 않으면 센서가 안 들어오는 것이다.
+ */
+data class LiveMotion(val gyro: Float = 0f, val accelOffGravity: Float = 0f, val samples: Int = 0)
+
+/** 연속 기록 진행 상황. 개수가 계속 늘어야 정상이다. */
+data class SessionState(
+    val fileName: String,
+    val elapsedSec: Int,
+    val acc: Int,
+    val gyro: Int,
+    val ppg: Int,
+    val ppgOn: Boolean,
+)

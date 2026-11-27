@@ -1,0 +1,75 @@
+' 삼성 유니버설 제스처 수집 — 워치가 센서 값을 기록 → 끝난 뒤 PC가 워치 로그를 꺼내 라벨 붙이기
+' 코드: android/wear/.../ContinuousRecorder.kt, tools/collect_samsung_gestures.ps1,
+'       tools/samsung_gesture_labeler.py
+@startuml
+title 삼성 제스처 수집 흐름
+actor 사용자
+participant "collect_samsung_gestures.ps1\n(PC)" as PS
+participant "logd 로그 버퍼\n(워치)" as LOGD
+participant "SamsungCollectScreen\n(워치)" as UI
+participant "ContinuousRecorder\n(워치)" as REC
+participant "삼성 UniversalGestureService\n(워치)" as UG
+participant "samsung_gesture_labeler.py\n(PC)" as LAB
+
+사용자 -> PS : -Prepare
+PS -> LOGD : logcat -b main -G 16M (버퍼 키우기)
+사용자 -> UI : '삼성 제스처 수집' 열기
+UI -> UI : 신체 센서 권한 요청 (처음 한 번)
+UI -> REC : start(hand, withPpg)
+loop 기록 중 (PC 연결 필요 없음)
+    REC -> REC : acc/gyr, ppg →\nsession__*.csv (실제 시각)
+    사용자 -> UG : 유니버설 제스처 (핀치, 주먹, 팔 앞뒤로...)
+    UG -> LOGD : "action performed : NEXTITEM" (실제 시각)
+    UI -> UI : 뒤로 가기(팔 앞뒤로)는 무시
+end
+사용자 -> UI : 밀어서 나가기
+UI -> REC : stop()
+사용자 -> PS : 실행 (워치 화면 켜 둠)
+PS -> REC : adb pull session__*.csv
+PS -> LOGD : logcat -d -b main -v epoch > session__*.logcat.txt
+PS -> LAB : --session --log --out
+LAB -> LAB : parse_logcat() → SamsungEvent 목록
+LAB -> LAB : parse_session() → 센서별 시간순 값
+LAB -> LAB : 인식 시각 기준 -1.5초~+0.3초 cut_window()
+LAB -> PS : 제스처별 요약 표 + samsung_<제스처>__<시각>.csv
+@enduml
+
+@startuml
+title samsung_gesture_labeler.py 구조
+skinparam classAttributeIconSize 0
+
+class SamsungEvent <<dataclass>> {
+    + epoch_ms: int
+    + action: str
+    + gesture: str
+}
+
+class WindowStats <<dataclass>> {
+    + gesture: str
+    + epoch_ms: int
+    + imu_rate_hz: float
+    + peak_gyro: float
+    + gyro_axis_peak: tuple[float, float, float]
+    + peak_acc_dev: float
+    + acc_axis_range: tuple[float, float, float]
+    + ppg_range: float | None
+}
+
+class samsung_gesture_labeler <<module>> {
+    + DEFAULT_ACTION_TO_GESTURE: dict[str, str]
+    + PPG_CHANNEL: int
+    + PPG_EMPTY: int
+    + parse_logcat(lines: Iterable[str], action_map: dict[str, str] | None): list[SamsungEvent]
+    + count_unmapped_actions(lines: Iterable[str], action_map: dict[str, str] | None): dict[str, int]
+    + parse_session(lines: Iterable[str]): dict[str, list[Sample]]
+    + cut_window(samples: list[Sample], center_ms: int, before_ms: int, after_ms: int): list[Sample] | None
+    + window_stats(event: SamsungEvent, session: dict, before_ms: int, after_ms: int): WindowStats | None
+    + decode_ppg(value: float): int
+    + summarize(stats: list[WindowStats]): str
+    + write_window(out_dir: Path, event: SamsungEvent, session: dict, before_ms: int, after_ms: int): Path | None
+    + main(argv: list[str] | None): int
+}
+
+samsung_gesture_labeler --> SamsungEvent
+samsung_gesture_labeler --> WindowStats
+@enduml

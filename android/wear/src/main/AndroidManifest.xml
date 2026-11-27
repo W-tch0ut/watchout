@@ -9,6 +9,10 @@
 
     <!-- 인식·녹화 결과를 진동으로 알려준다 -->
     <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- 삼성 제스처 수집: 심박 원시 신호(PPG)를 읽는다. 처음 쓸 때 사용자에게 허용을 묻는다 -->
+    <uses-permission android:name="android.permission.BODY_SENSORS" />
+    <!-- 가속도·자이로는 200Hz로 읽는다. 200Hz까지는 HIGH_SAMPLING_RATE_SENSORS 권한이 필요 없다 -->
+
 
     <application
         android:allowBackup="false"

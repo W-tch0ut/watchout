@@ -13,12 +13,14 @@ import com.watchout.wear.ui.CollectScreen
 import com.watchout.wear.ui.MenuScreen
 import com.watchout.wear.ui.RecognizeScreen
 import com.watchout.wear.ui.RecordScreen
+import com.watchout.wear.ui.SamsungCollectScreen
 
 /**
  * 제스처 툴 화면 구성. 오른쪽으로 밀면 이전 화면으로 돌아간다.
  *
  * menu ─┬─ recognize          실시간 인식
- *       └─ collect ─ record/{id}   라벨 고르기 → 녹화
+ *       ├─ collect ─ record/{id}   라벨 고르기 → 녹화
+ *       └─ samsung            삼성 유니버설 제스처 수집 (연속 기록)
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,8 +35,10 @@ class MainActivity : ComponentActivity() {
                             vm = vm,
                             onRecognize = { nav.navigate("recognize") },
                             onCollect = { nav.navigate("collect") },
+                            onSamsungCollect = { nav.navigate("samsung") },
                         )
                     }
+                    composable("samsung") { SamsungCollectScreen(vm) }
                     composable("recognize") { RecognizeScreen(vm) }
                     composable("collect") {
                         CollectScreen(vm, onPick = { nav.navigate("record/${it.id}") })
