@@ -27,3 +27,6 @@ captures/
 *.aab
 *.jks
 *.keystore
+
+# 로봇카 안내 음성 파일 (공유 드라이브에서 관리)
+voice/clips/

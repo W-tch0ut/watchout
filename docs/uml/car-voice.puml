@@ -1,0 +1,104 @@
+' 로봇카 음성 안내 (#68) — 로봇카가 명령·상태를 스피커로 말한다.
+' 음성 명령(말 알아듣기)은 워치 앱이 맡는다 (#69).
+' 코드: voice/announcer.py, voice/audio.py, voice/run.py, voice/make_clips.py
+@startuml
+title voice 패키지 구조
+skinparam classAttributeIconSize 0
+
+package "로직 (기기 없이 pytest)" {
+    class Phrase <<dataclass>> {
+        + id: str
+        + text: str
+        + urgent: bool
+    }
+
+    class announcer <<module>> {
+        + STATE_PHRASES: dict[str, Phrase]
+        + COMMAND_PHRASES: dict[str, Phrase]
+        + all_phrases(): list[Phrase]
+    }
+
+    interface Speaker <<Protocol>> {
+        + say(phrase: Phrase): None
+    }
+
+    class Announcer {
+        - _speaker: Speaker
+        - _clock: Callable[[], float]
+        - _min_interval_s: float
+        - _last_state: str | None
+        - _last_time: float | None
+        + on_command(command: Mapping[str, object]): Phrase | None
+        + on_state(state: str): Phrase | None
+    }
+
+    class run <<module>> {
+        + parse_line(line: str): Event | None
+        + parse_device(value: str | None): str | int | None
+        + main(argv: list[str] | None): int
+    }
+}
+
+package "기기 (스피커)" {
+    class ClipSpeaker {
+        - _clips_dir: Path
+        - _volume: float
+        - _device: str | int | None
+        - _queue: Queue[Phrase]
+        + busy: bool
+        + say(phrase: Phrase): None
+        - _load(phrase: Phrase): bytes | None
+        - _play(phrase: Phrase): None
+    }
+
+    class audio <<module>> {
+        + MAX_VOLUME: float
+        + clamp_volume(volume: float): float
+        + scale_pcm16(data: bytes, volume: float): bytes
+        + read_wav(data: bytes): tuple[bytes, int, int]
+    }
+}
+
+class make_clips <<module>> {
+    + clip_list(): list[tuple[str, str]]
+    + main(argv: list[str] | None): int
+}
+
+announcer --> Phrase
+Announcer --> announcer
+Announcer o-- Speaker
+Speaker <|.. ClipSpeaker
+ClipSpeaker --> audio
+run --> Announcer
+run --> ClipSpeaker
+make_clips --> announcer
+@enduml
+
+@startuml
+title 음성 명령·안내 흐름 (워치가 듣고, 로봇카가 말한다)
+actor 사용자
+participant "워치 앱\n(음성 인식, 기기 안)" as W
+participant "로봇카 통신\n(#42)" as COMM
+participant "로봇카 주행\n(최소리)" as CAR
+participant Announcer as A
+participant "ClipSpeaker\n(MAX98357A + 스피커)" as SPK
+
+사용자 -> W : 버튼 누르고 "휴대폰 가져다줘"
+note right of W : 녹음 원본은 워치 밖으로\n보내지 않는다
+W -> COMM : {"cmd":"grab","target":"phone"}\n(제스처와 같은 명령 메시지)
+COMM -> CAR : 명령 전달
+COMM -> A : on_command(command)
+A -> SPK : say("가져올게요")
+CAR -> A : on_state("grabbing")
+A -> SPK : say("물건 집는 중입니다")
+CAR -> A : on_state("delivering")
+note right of A : 3초 안에 다른 상태가 오면\n건너뛴다 (urgent 제외)
+A -> SPK : say("물건을 가져가는 중입니다")
+
+== 멈춤 ==
+사용자 -> W : "멈춰"
+W -> COMM : {"cmd":"stop"}
+COMM -> CAR : 정지 (가장 먼저)
+COMM -> A : on_command(stop)
+A -> SPK : say("멈출게요")  (urgent: 기다리던 안내를 건너뜀)
+@enduml
