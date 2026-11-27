@@ -34,6 +34,11 @@
 - 통신: 워치 ↔ 로봇카 BLE 또는 Wi-Fi(MQTT)
 - 서버: Firebase (Authentication, Firestore, Cloud Messaging 알림)
 
+## ROS2 설정
+- **`ROS_DOMAIN_ID = 2`** (팀 값). 같은 와이파이에서 Hiwonder 기본값(0)을 쓰는 다른 팀 로봇과 메시지가 섞이지 않게 한다.
+- 로봇카·로봇팔 등 ROS2를 쓰는 모든 기기와 코드는 이 값을 쓴다. 코드에서 다른 값으로 바꾸지 않는다.
+- Hiwonder 도커 컨테이너에서는 `/home/ubuntu/ros2_ws/.typerc`의 `export ROS_DOMAIN_ID=`에서 설정한다.
+
 ## 개발 환경
 | 항목 | 버전 |
 |---|---|
