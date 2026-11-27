@@ -9,6 +9,8 @@ import com.watchout.mobile.auth.FirebaseAuthRepository
 import com.watchout.mobile.auth.GoogleSignInHelper
 import com.watchout.mobile.guardian.FirestoreGuardianRepository
 import com.watchout.mobile.guardian.GuardianRepository
+import com.watchout.mobile.profile.FirestoreProfileRepository
+import com.watchout.mobile.profile.ProfileRepository
 
 /**
  * 앱 전체에서 함께 쓰는 부품 보관함.
@@ -19,6 +21,9 @@ class AppContainer(context: Context) {
     val authRepository: AuthRepository by lazy { FirebaseAuthRepository(FirebaseAuth.getInstance()) }
     val guardianRepository: GuardianRepository by lazy {
         FirestoreGuardianRepository(FirebaseFirestore.getInstance())
+    }
+    val profileRepository: ProfileRepository by lazy {
+        FirestoreProfileRepository(FirebaseFirestore.getInstance())
     }
     val googleSignIn: GoogleSignInHelper by lazy { GoogleSignInHelper(context.applicationContext) }
 }

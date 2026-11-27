@@ -34,11 +34,11 @@ import com.watchout.mobile.guardian.GuardianValidator
 import com.watchout.mobile.guardian.GuardianViewModel
 
 /**
- * 보호자 연락처 화면 (이슈 #49 완료 조건: 로그인 후 등록·수정).
+ * 보호자 연락처 화면 = 본인(환자) 모드의 첫 화면 (#49 등록·수정, #66 모드).
  * 목록 + [추가] 버튼, 항목마다 [수정] [삭제], 추가·수정은 작은 창(다이얼로그)에서 한다.
  */
 @Composable
-fun GuardianScreen(vm: GuardianViewModel, user: AppUser, onSignOut: () -> Unit) {
+fun GuardianScreen(vm: GuardianViewModel, user: AppUser, onChangeMode: () -> Unit, onSignOut: () -> Unit) {
     val guardians by vm.guardians.collectAsStateWithLifecycle()
     val editor by vm.editor.collectAsStateWithLifecycle()
     val listError by vm.listError.collectAsStateWithLifecycle()
@@ -52,13 +52,7 @@ fun GuardianScreen(vm: GuardianViewModel, user: AppUser, onSignOut: () -> Unit) 
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("보호자 연락처", style = MaterialTheme.typography.headlineSmall)
-                Text(user.email ?: user.displayName ?: "", style = MaterialTheme.typography.bodySmall)
-            }
-            TextButton(onClick = onSignOut) { Text("로그아웃") }
-        }
+        ModeHeader(title = "보호자 연락처", user = user, onChangeMode = onChangeMode, onSignOut = onSignOut)
         Text(
             "응급 상황이 확정되면 이 분들께 알림이 가요. (최대 ${GuardianValidator.MAX_GUARDIANS}명)",
             style = MaterialTheme.typography.bodyMedium,

@@ -1,0 +1,98 @@
+' 폰 앱 (:mobile 모듈) — 본인(환자) / 보호자 모드 (#66)
+' 1) 클래스 구조  2) 로그인 후 화면 고르기 흐름
+' 로그인·보호자 연락처 클래스는 mobile-login.puml 참고
+
+@startuml mobile-app-mode-classes
+title 폰 앱 모드 — 클래스 구조
+skinparam classAttributeIconSize 0
+
+package "com.watchout.mobile.profile" {
+    enum UserRole {
+        PATIENT
+        GUARDIAN
+        + firestoreValue: String
+        + label: String
+        + description: String
+        + {static} fromFirestore(value: String?): UserRole?
+    }
+    enum ProfileError {
+        LOAD_FAILED
+        SAVE_FAILED
+        + message: String
+    }
+    interface ProfileRepository {
+        + observeRole(uid: String): Flow<UserRole?>
+        + setRole(uid: String, role: UserRole): Unit
+    }
+    class FirestoreProfileRepository {
+        - db: FirebaseFirestore
+        + observeRole(uid: String): Flow<UserRole?>
+        + setRole(uid: String, role: UserRole): Unit
+    }
+    class RoleUiState {
+        + role: UserRole?
+        + isLoading: Boolean
+        + isChoosing: Boolean
+        + isSaving: Boolean
+        + error: ProfileError?
+        + showSelect: Boolean
+        + canCancel: Boolean
+    }
+    class RoleViewModel {
+        - uid: String
+        - repo: ProfileRepository
+        + state: StateFlow<RoleUiState>
+        + choose(role: UserRole): Unit
+        + startChange(): Unit
+        + cancelChange(): Unit
+    }
+}
+
+package "com.watchout.mobile.ui" {
+    class RoleScreens <<Composable>> {
+        + LoadingScreen(): Unit
+        + RoleSelectScreen(current: UserRole?, isSaving: Boolean, error: ProfileError?, canCancel: Boolean, ...): Unit
+        + GuardianHomeScreen(user: AppUser, onChangeMode: () -> Unit, onSignOut: () -> Unit): Unit
+        + ModeHeader(title: String, user: AppUser, ...): Unit
+    }
+    class GuardianScreen <<Composable>> {
+        + GuardianScreen(vm: GuardianViewModel, user: AppUser, onChangeMode: () -> Unit, onSignOut: () -> Unit): Unit
+    }
+}
+
+class MainActivity {
+    + onCreate(savedInstanceState: Bundle?): Unit
+}
+
+ProfileRepository <|.. FirestoreProfileRepository
+RoleViewModel o-- ProfileRepository
+RoleViewModel *-- RoleUiState
+RoleUiState --> UserRole
+RoleUiState --> ProfileError
+MainActivity --> RoleViewModel
+MainActivity --> RoleScreens
+MainActivity --> GuardianScreen
+GuardianScreen --> RoleScreens : ModeHeader
+@enduml
+
+@startuml mobile-app-mode-flow
+title 로그인 후 어떤 화면을 보여줄까
+start
+:로그인 성공 (currentUser != null);
+:RoleViewModel이 users/{uid}.role 구독;
+if (서버 응답 왔나?) then (아직)
+  :LoadingScreen;
+  stop
+endif
+if (role이 없거나 "모드 바꾸기" 중?) then (예)
+  :RoleSelectScreen\n[본인(환자)] [보호자];
+  :choose(role) → users/{uid}.role 저장;
+endif
+if (role) then (GUARDIAN)
+  :GuardianHomeScreen\n연결된 가족·받은 알림 자리 (#50);
+else (PATIENT)
+  :GuardianScreen\n보호자 연락처 등록·수정 (#49);
+endif
+:[모드 바꾸기] → 선택 화면 (취소하면 원래 화면);
+stop
+@enduml
