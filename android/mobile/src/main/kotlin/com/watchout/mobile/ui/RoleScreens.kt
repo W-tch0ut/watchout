@@ -79,36 +79,6 @@ fun RoleSelectScreen(
     }
 }
 
-/**
- * 보호자 모드 첫 화면.
- * 환자와 연결하는 방법과 알림 내용은 #50에서 만든다. 지금은 자리만 잡아 둔다.
- */
-@Composable
-fun GuardianHomeScreen(user: AppUser, onChangeMode: () -> Unit, onSignOut: () -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .safeDrawingPadding()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        ModeHeader(title = "보호자", user = user, onChangeMode = onChangeMode, onSignOut = onSignOut)
-
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("연결된 가족", style = MaterialTheme.typography.titleMedium)
-                Text("아직 연결된 가족이 없어요. 연결 기능은 곧 추가돼요.", style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-        Card(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("받은 알림", style = MaterialTheme.typography.titleMedium)
-                Text("응급 알림이 오면 여기에 사진과 상태가 표시돼요.", style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-    }
-}
-
 /** 두 모드 화면 위쪽 공통 줄: 제목 + 계정 + [모드 바꾸기] [로그아웃] */
 @Composable
 fun ModeHeader(title: String, user: AppUser, onChangeMode: () -> Unit, onSignOut: () -> Unit) {

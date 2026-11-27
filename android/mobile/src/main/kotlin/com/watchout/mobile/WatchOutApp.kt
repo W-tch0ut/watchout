@@ -4,13 +4,19 @@ import android.app.Application
 import android.content.Context
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.watchout.mobile.alert.AlertRepository
+import com.watchout.mobile.alert.FirestoreAlertRepository
 import com.watchout.mobile.auth.AuthRepository
 import com.watchout.mobile.auth.FirebaseAuthRepository
 import com.watchout.mobile.auth.GoogleSignInHelper
 import com.watchout.mobile.guardian.FirestoreGuardianRepository
 import com.watchout.mobile.guardian.GuardianRepository
+import com.watchout.mobile.link.FirestoreLinkRepository
+import com.watchout.mobile.link.LinkRepository
 import com.watchout.mobile.profile.FirestoreProfileRepository
 import com.watchout.mobile.profile.ProfileRepository
+import com.watchout.mobile.sms.AndroidSmsSender
+import com.watchout.mobile.sms.SmsSender
 
 /**
  * 앱 전체에서 함께 쓰는 부품 보관함.
@@ -25,6 +31,9 @@ class AppContainer(context: Context) {
     val profileRepository: ProfileRepository by lazy {
         FirestoreProfileRepository(FirebaseFirestore.getInstance())
     }
+    val linkRepository: LinkRepository by lazy { FirestoreLinkRepository(FirebaseFirestore.getInstance()) }
+    val alertRepository: AlertRepository by lazy { FirestoreAlertRepository(FirebaseFirestore.getInstance()) }
+    val smsSender: SmsSender by lazy { AndroidSmsSender(context) }
     val googleSignIn: GoogleSignInHelper by lazy { GoogleSignInHelper(context.applicationContext) }
 }
 
