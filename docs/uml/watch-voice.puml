@@ -89,6 +89,10 @@ package "com.watchout.wear (:wear)" {
     class LogCommandSender {
         + send(command: RobotCommand): Unit
     }
+    class PhoneCommandSender {
+        - app: Context
+        + send(command: RobotCommand): Unit
+    }
 }
 
 RobotCommand <|.. Stop
@@ -106,13 +110,15 @@ VoiceCommandParser --> VoiceResult
 VoiceConversation --> VoiceCommandParser
 
 CommandSender <|.. LogCommandSender
+CommandSender <|.. PhoneCommandSender
 VoiceScreen --> VoiceViewModel
 VoiceViewModel *-- OnDeviceSpeechInput
 VoiceViewModel *-- VoiceConversation
-VoiceViewModel o-- CommandSender
+VoiceViewModel o-- PhoneCommandSender
 VoiceViewModel --> VoiceUiState
 OnDeviceSpeechInput --> Listener
-note bottom of LogCommandSender : 임시 구현. #42 통신이 정해지면\nMQTT/BLE 구현으로 바꿔 끼운다.
+note bottom of PhoneCommandSender : #42: 명령에 source:"voice"·ts를 붙여\n폰으로 보낸다(Data Layer /watchout/msg/cmd).\n폰이 로봇카(MQTT)에 전달한다. (phone-watch-link.puml)
+note bottom of LogCommandSender : 처음 임시 구현 (Logcat만). 지금은 쓰지 않는다
 @enduml
 
 @startuml

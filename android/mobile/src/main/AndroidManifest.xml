@@ -4,6 +4,14 @@
 
     <!-- Firebase 로그인·Firestore 통신 -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 로봇카 찾기: 같은 Wi-Fi의 UDP 방송을 듣는다 (#42 데모) -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <!-- 로봇카와 MQTT 연결을 앱 화면이 닫혀도 유지한다 (#42 데모).
+         connectedDevice 종류는 위의 CHANGE_WIFI_MULTICAST_STATE 같은 연결 권한이 있어야 시작된다 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!--
         보호자 번호로 초대 코드·응급 문자 보내기 (#50). 화면에서 버튼을 누를 때 한 번 물어본다.
@@ -37,5 +45,31 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- 로봇카와 MQTT 연결 유지 + 워치 명령 전달 (#42 데모) -->
+        <service
+            android:name=".car.CarConnectionService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <!-- 워치가 보낸 명령·낙상·제스처 등록 상황·제스처 목록 받기 (Wear OS Data Layer) -->
+        <service
+            android:name=".car.WatchMessageListener"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/watchout/msg"
+                    android:scheme="wear" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
+                <data
+                    android:host="*"
+                    android:pathPrefix="/watchout/gestures"
+                    android:scheme="wear" />
+            </intent-filter>
+        </service>
     </application>
 </manifest>

@@ -1,0 +1,6 @@
+# 데모 로봇카(PC) 실행용. 팀 CI에는 설치하지 않는다 (테스트하는 모듈은 표준 라이브러리만 쓴다).
+#   python -m venv demo\.venv
+#   demo\.venv\Scripts\python -m pip install -r demo\requirements.txt
+amqtt==0.12.2
+paho-mqtt==2.2.0
+opencv-python==5.1.0.95

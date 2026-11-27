@@ -41,8 +41,8 @@ class VoiceViewModel(app: Application) : AndroidViewModel(app) {
     private val speech = OnDeviceSpeechInput(app)
     private val conversation = VoiceConversation()
 
-    /** 지금은 Logcat 출력. #42 통신이 정해지면 이 한 줄만 바꾼다. */
-    private val sender: CommandSender = LogCommandSender()
+    /** 폰으로 보낸다 → 폰이 로봇카에 전달한다 (#42). Logcat(WatchOutCmd)에도 명령 JSON을 남긴다. */
+    private val sender: CommandSender = PhoneCommandSender(app)
 
     private val vibrator: Vibrator =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

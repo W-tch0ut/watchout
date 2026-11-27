@@ -60,6 +60,15 @@ package "com.watchout.mobile.ui" {
     class GuardianHomeScreen <<Composable>> {
         + GuardianHomeScreen(vm: GuardianHomeViewModel, user: AppUser, onChangeMode: () -> Unit, onSignOut: () -> Unit): Unit
     }
+    class PatientHome <<Composable>> {
+        + PatientHome(content: (PatientTab) -> Unit): Unit
+    }
+    enum PatientTab {
+        CAR
+        GESTURES
+        GUARDIANS
+        SMS
+    }
 }
 
 class MainActivity {
@@ -73,11 +82,14 @@ RoleUiState --> UserRole
 RoleUiState --> ProfileError
 MainActivity --> RoleViewModel
 MainActivity --> RoleScreens
-MainActivity --> GuardianScreen
+MainActivity --> PatientHome
+PatientHome --> PatientTab
+PatientHome --> GuardianScreen : 보호자 탭
 MainActivity --> GuardianHomeScreen
 GuardianScreen --> RoleScreens : ModeHeader
 GuardianHomeScreen --> RoleScreens : ModeHeader
 note bottom of GuardianHomeScreen : 연결·알림 클래스는 mobile-guardian.puml (#50)
+note bottom of PatientHome : 로봇카·제스처·문자 탭은 phone-watch-link.puml (#42)
 @enduml
 
 @startuml mobile-app-mode-flow
@@ -96,7 +108,8 @@ endif
 if (role) then (GUARDIAN)
   :GuardianHomeScreen\n연결된 가족·받은 알림 (#50);
 else (PATIENT)
-  :GuardianScreen\n보호자 연락처 등록·수정 (#49)\n초대 문자·테스트 응급 알림 (#50);
+  :PatientHome 탭 (#42)\n🚗 로봇카 · ✋ 제스처 · 👪 보호자 · ✉️ 문자;
+  :👪 보호자 탭 = GuardianScreen\n보호자 연락처 등록·수정 (#49)\n초대 문자·테스트 응급 알림 (#50);
 endif
 :[모드 바꾸기] → 선택 화면 (취소하면 원래 화면);
 stop

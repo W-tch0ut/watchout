@@ -1,0 +1,263 @@
+' 폰 ↔ 워치 ↔ 로봇카 (#42 데모): 폰이 로봇카와 연결하고, 워치는 센서만 맡는다
+' 코드: android/gesture/.../{WatchLink,CarScanner,CarProtocol}.kt
+'       android/mobile/.../{car,gesture,sms}/*, ui/{CarScreen,GestureScreen,SmsScreen,PatientHome}.kt
+'       android/wear/.../demo/{PhoneLink,RemoteRegistrar,WatchOutService}.kt
+@startuml phone-watch-link-classes
+title 폰 ↔ 워치 ↔ 로봇카 — 클래스 구조
+skinparam classAttributeIconSize 0
+
+package "com.watchout.gesture (:gesture, 폰·워치 공용)" {
+    class WatchLink <<object>> {
+        + PATH_STATUS: String
+        + PATH_GESTURES: String
+        + MSG_CMD: String
+        + MSG_FALL: String
+        + MSG_FALL_RESULT: String
+        + MSG_REG: String
+        + MSG_REG_STATE: String
+        + status(state: LinkState, carName: String?, message: String, ts: Long): String
+        + parseStatus(text: String): WatchStatus?
+        + gestureList(gestures: List<GestureSummary>): String
+        + parseGestureList(text: String): List<GestureSummary>
+        + regStart(name: String, command: CarCommand): String
+        + regAction(action: RegAction): String
+        + regDelete(id: String): String
+        + parseRegRequest(text: String): RegRequest?
+        + regState(state: RegState): String
+        + parseRegState(text: String): RegState?
+    }
+    class CarScanner <<object>> {
+        + scan(durationMs: Long, port: Int): List<CarInfo>
+    }
+    class RegState <<data>> {
+        + phase: RegPhase
+        + name: String
+        + count: Int
+        + secondsLeft: Int
+        + message: String
+        + canSave: Boolean
+        + busy: Boolean
+    }
+    enum RegPhase {
+        READY
+        COUNTDOWN
+        RECORDING
+        ADDED
+        FAILED
+        SAVED
+        CANCELLED
+    }
+    enum RegAction {
+        START
+        RECORD
+        SAVE
+        CANCEL
+        DELETE
+    }
+    class GestureSummary <<data>> {
+        + id: String
+        + name: String
+        + command: CarCommand
+        + samples: Int
+    }
+    enum LinkState {
+        OFF
+        CONNECTING
+        CONNECTED
+        ERROR
+    }
+    class GesturePresets <<object>> {
+        + ALL: List<Pair<String, CarCommand>>
+    }
+}
+
+package "com.watchout.mobile (폰)" {
+    class CarHub <<object>> {
+        + link: MutableStateFlow<CarLinkState>
+        + events: MutableStateFlow<List<String>>
+        + gestures: MutableStateFlow<List<GestureSummary>?>
+        + reg: MutableStateFlow<RegState?>
+        + log(message: String): Unit
+    }
+    class CarConnectionService {
+        - link: CarLink?
+        - car: CarInfo?
+        + {static} connect(context: Context, car: CarInfo): Unit
+        + {static} disconnect(context: Context): Unit
+        + {static} forwardCommand(json: String): Boolean
+        + {static} forwardFall(json: String): Boolean
+    }
+    class CarLink {
+        + connect(): Unit
+        + send(topic: String, json: String): Unit
+        + close(): Unit
+    }
+    class WatchMessageListener {
+        + onMessageReceived(event: MessageEvent): Unit
+        + onDataChanged(events: DataEventBuffer): Unit
+    }
+    class WatchBridge <<object>> {
+        + send(context: Context, path: String, text: String): Boolean
+        + publishStatus(context: Context, state: CarLinkState): Unit
+    }
+    interface WatchRepository {
+        + gestures: StateFlow<List<GestureSummary>?>
+        + regState: StateFlow<RegState?>
+        + isWatchConnected(): Boolean
+        + sendMessage(path: String, text: String): Boolean
+        + refreshGestures(): Unit
+        + clearRegState(): Unit
+    }
+    class DataLayerWatchRepository
+    interface CarSession {
+        + link: StateFlow<CarLinkState>
+        + events: StateFlow<List<String>>
+        + connect(car: CarInfo): Unit
+        + disconnect(): Unit
+    }
+    class ServiceCarSession
+    interface CarFinder {
+        + scan(): List<CarInfo>
+    }
+    class WifiCarFinder
+    class CarViewModel {
+        + state: StateFlow<CarUiState>
+        + scan(): Unit
+        + connect(car: CarInfo): Unit
+        + disconnect(): Unit
+        + checkWatch(): Unit
+    }
+    class GestureViewModel {
+        + state: StateFlow<GestureUiState>
+        + start(name: String, command: CarCommand): Unit
+        + record(): Unit
+        + save(): Unit
+        + close(): Unit
+        + delete(id: String): Unit
+    }
+    class SmsViewModel {
+        + state: StateFlow<SmsUiState>
+        + onName(v: String): Unit
+        + onAddress(v: String): Unit
+        + onNote(v: String): Unit
+        + save(): Unit
+    }
+    class SmsTemplate <<object>> {
+        + compose(s: SmsSettings, time: LocalDateTime, impactG: Float, confirmedBy: String, moving: Boolean?): String
+        + preview(s: SmsSettings, now: LocalDateTime): String
+    }
+    class PatientHome <<Composable>>
+}
+
+package "com.watchout.wear.demo (워치)" {
+    class PhoneLink <<object>> {
+        + sendToPhone(context: Context, path: String, text: String): Unit
+        + publishGestures(context: Context): Unit
+        + applyStatus(context: Context, json: String): Unit
+        + onAppOpened(context: Context): Unit
+    }
+    class PhoneLinkListener {
+        + onDataChanged(events: DataEventBuffer): Unit
+        + onMessageReceived(event: MessageEvent): Unit
+    }
+    class RemoteRegistrar <<object>> {
+        - shapes: List<FloatArray>
+        + handle(context: Context, req: RegRequest): Unit
+    }
+    class WatchOutService {
+        + {static} start(context: Context): Unit
+        + {static} stop(context: Context): Unit
+        + {static} fallResult(context: Context, json: String): Unit
+    }
+}
+
+WatchLink --> RegState
+WatchLink --> GestureSummary
+WatchLink --> LinkState
+RegState --> RegPhase
+
+CarConnectionService *-- CarLink
+CarConnectionService --> CarHub
+CarConnectionService --> WatchBridge : 상태·낙상 결과를 워치로
+WatchMessageListener --> CarConnectionService : 명령·낙상을 로봇카로
+WatchMessageListener --> CarHub
+WatchRepository <|.. DataLayerWatchRepository
+DataLayerWatchRepository --> CarHub
+DataLayerWatchRepository --> WatchBridge
+CarSession <|.. ServiceCarSession
+ServiceCarSession --> CarConnectionService
+CarFinder <|.. WifiCarFinder
+WifiCarFinder --> CarScanner
+CarViewModel o-- CarFinder
+CarViewModel o-- CarSession
+CarViewModel o-- WatchRepository
+GestureViewModel o-- WatchRepository
+GestureViewModel --> WatchLink
+SmsViewModel --> SmsTemplate
+PatientHome --> CarViewModel
+PatientHome --> GestureViewModel
+PatientHome --> SmsViewModel
+
+PhoneLinkListener --> PhoneLink
+PhoneLinkListener --> RemoteRegistrar
+PhoneLinkListener --> WatchOutService
+PhoneLink --> WatchOutService : 연결되면 시작·끊기면 멈춤
+WatchOutService --> PhoneLink : 명령·낙상 의심을 폰으로
+RemoteRegistrar --> PhoneLink : 진행 상황·목록을 폰으로
+@enduml
+
+@startuml phone-watch-link-connect
+title 폰이 로봇카에 연결 → 워치가 손짓을 로봇카에 전달
+actor 사용자
+participant "CarScreen /\nCarViewModel (폰)" as UI
+participant "CarConnectionService\n(폰)" as SVC
+participant "로봇카\n(데모 PC)" as CAR
+participant "Data Layer\n(블루투스)" as DL
+participant "PhoneLink /\nWatchOutService (워치)" as W
+
+사용자 -> UI : [로봇카 찾기]
+UI -> UI : WifiCarFinder → CarScanner (UDP 방송 4초)
+CAR --> UI : {"type":"watchout_car",...}
+사용자 -> UI : 로봇카 누르기
+UI -> SVC : connect(car)
+SVC -> CAR : MQTT 연결, status·fall/result 구독
+SVC -> DL : /watchout/status {"state":"connected",...}
+DL -> W : applyStatus → 감지 서비스 시작
+== 손짓 ==
+사용자 -> W : "부르기" 손짓 (센서)
+W -> W : MotionSegmenter → DtwMatcher.match
+W -> DL : /watchout/msg/cmd {"cmd":"approach","target":"user",...}
+DL -> SVC : WatchMessageListener → forwardCommand
+SVC -> CAR : watchout/cars/{id}/cmd
+CAR -> SVC : status {"state":"moving","msg":"사용자 쪽으로 다가갑니다"}
+SVC -> DL : /watchout/status (msg 갱신)
+DL -> W : 워치 화면 "차: 사용자 쪽으로 다가갑니다"
+@enduml
+
+@startuml phone-watch-link-register
+title 폰에서 제스처 등록 (버튼은 폰, 녹화는 워치)
+actor 사용자
+participant "GestureScreen /\nGestureViewModel (폰)" as PHONE
+participant "Data Layer" as DL
+participant "RemoteRegistrar\n(워치)" as REG
+
+사용자 -> PHONE : [새 제스처 등록] → "부르기" 고르기
+PHONE -> DL : /watchout/msg/reg {"action":"start","name":"부르기","command":"approach"}
+DL -> REG : 센서 켜기, 워치 등록 화면(알림/팝업)
+REG -> DL : reg_state READY
+DL -> PHONE : "⌚ 워치를 확인하세요!"
+loop 3~5번
+    사용자 -> PHONE : [시연]
+    PHONE -> DL : {"action":"record"}
+    DL -> REG : 3초 세기(진동) → "● 지금!" → 2.5초 녹화
+    사용자 -> REG : 워치 찬 손으로 동작
+    REG -> REG : DtwMatcher.extractSegment → shape
+    REG -> DL : reg_state ADDED (n/5) 또는 FAILED
+    DL -> PHONE : 진행 상황 표시
+end
+사용자 -> PHONE : [저장]
+PHONE -> DL : {"action":"save"}
+DL -> REG : DtwMatcher.register → CustomGestureStore 저장
+REG -> DL : reg_state SAVED + /watchout/gestures 목록
+DL -> PHONE : "등록했어요 ✓", 목록 갱신
+@enduml

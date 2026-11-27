@@ -1,0 +1,165 @@
+' 데모: 워치 (센서: 제스처·낙상) — 로봇카와의 통신은 폰이 한다 (#42)
+' 코드: android/wear/.../demo/*, android/gesture/.../{CarProtocol,FallDetector,CustomGestures,TapCounter}.kt, demo/*.py
+' 폰 ↔ 워치 ↔ 로봇카 전체 구조는 phone-watch-link.puml
+@startuml demo-watch-classes
+title 워치 데모 구조
+skinparam classAttributeIconSize 0
+
+package "com.watchout.wear.demo" {
+    class WatchOutService {
+        - streamer: SensorStreamer
+        - segmenter: MotionSegmenter
+        - fallDetector: FallDetector
+        - fallTimer: FallAlertTimer
+        - gestures: List<CustomGesture>
+        - onSample(s: SensorSample): Unit
+        - sendCommand(cmd: CarCommand, source: String, gesture: String?): Unit
+        - triggerFall(impactG: Float, source: String): Unit
+        - cancelFall(): Unit
+        - showFallResult(json: String): Unit
+        + {static} start(context: Context): Unit
+        + {static} stop(context: Context): Unit
+        + {static} send(context: Context, cmd: CarCommand): Unit
+        + {static} testFall(context: Context): Unit
+        + {static} cancelFall(context: Context): Unit
+        + {static} fallResult(context: Context, json: String): Unit
+    }
+    class PhoneLink <<object>> {
+        + sendToPhone(context: Context, path: String, text: String): Unit
+        + publishGestures(context: Context): Unit
+        + applyStatus(context: Context, json: String): Unit
+        + onAppOpened(context: Context): Unit
+    }
+    class PhoneLinkListener
+    class RemoteRegistrar <<object>> {
+        + handle(context: Context, req: RegRequest): Unit
+    }
+    class Haptics <<object>> {
+        + pulse(context: Context, pattern: LongArray): Unit
+        + stop(context: Context): Unit
+    }
+    class CustomGestureStore {
+        + load(): List<CustomGesture>
+        + save(gestures: List<CustomGesture>): Unit
+        + add(gesture: CustomGesture): Unit
+        + delete(id: String): Unit
+    }
+    class DemoViewModel {
+        + gestures: List<CustomGesture>
+        + regPhase: RegPhase
+        + devMode: Boolean
+        - devTaps: TapCounter
+        + onTitleTap(): String?
+        + changeDevMode(on: Boolean): Unit
+        + refreshGestures(): Unit
+        + delete(id: String): Unit
+        + beginRegistration(): Unit
+        + recordSample(): Unit
+        + saveGesture(name: String, command: CarCommand): Unit
+        + send(cmd: CarCommand): Unit
+        + testFall(): Unit
+    }
+    class DemoState <<object>> {
+        + connection: Connection
+        + carName: String?
+        + carStatus: String
+        + events: List<String>
+        + fall: FallUi?
+        + remoteReg: RegState?
+        + registering: Boolean
+        + gesturesVersion: Int
+        + log(message: String): Unit
+    }
+}
+
+package "com.watchout.gesture (:gesture)" {
+    class CarProtocol <<object>> {
+        + {static} command(cmd: CarCommand, source: String, gesture: String?, ts: Long): String
+        + {static} fallSuspected(ts: Long, impactG: Float, source: String): String
+        + {static} parseFallResult(text: String): FallResult?
+    }
+    enum CarCommand {
+        + id: String
+        + wireCmd: String
+        + args: Map<String, Any>
+    }
+    class FallDetector {
+        + onSample(s: SensorSample): Float?
+    }
+    class FallAlertTimer {
+        + start(nowMs: Long): Unit
+        + cancel(): Boolean
+        + tick(nowMs: Long): Phase
+        + secondsLeft(nowMs: Long): Int
+    }
+    class DtwMatcher <<object>> {
+        + {static} STILL_RATIO: Float
+        + {static} MIN_ENERGY_RATIO: Float
+        + {static} shape(frames: List<MotionFrame>): FloatArray
+        + {static} distance(a: FloatArray, b: FloatArray): Float
+        + {static} register(id: String, name: String, command: CarCommand, shapes: List<FloatArray>): CustomGesture
+        + {static} match(shape: FloatArray, gestures: List<CustomGesture>): CustomMatch?
+        + {static} effectiveThreshold(g: CustomGesture): Float
+        + {static} explain(shape: FloatArray, gestures: List<CustomGesture>): String?
+        + {static} stillDistance(shape: FloatArray): Float
+        + {static} peakGyro(shape: FloatArray): Float
+        + {static} extractSegment(samples: List<SensorSample>, hand: WearingHand): List<MotionFrame>?
+    }
+    class TapCounter {
+        - required: Int
+        - gapMs: Long
+        + onTap(nowMs: Long): Int
+    }
+    class CustomGesture <<data>> {
+        + name: String
+        + command: CarCommand
+        + templates: List<FloatArray>
+        + threshold: Float
+    }
+}
+
+WatchOutService *-- FallDetector
+WatchOutService *-- FallAlertTimer
+WatchOutService --> DtwMatcher
+WatchOutService --> CustomGestureStore
+WatchOutService --> DemoState
+WatchOutService --> PhoneLink : 명령·낙상 의심을 폰으로
+WatchOutService --> CarProtocol
+WatchOutService --> Haptics
+PhoneLinkListener --> PhoneLink
+PhoneLinkListener --> RemoteRegistrar
+PhoneLink --> WatchOutService : 폰이 로봇카에 연결되면 시작
+PhoneLink --> DemoState
+RemoteRegistrar --> DtwMatcher
+RemoteRegistrar --> CustomGestureStore
+RemoteRegistrar --> PhoneLink
+RemoteRegistrar --> Haptics
+DemoViewModel --> CustomGestureStore
+DemoViewModel --> DtwMatcher
+DemoViewModel --> WatchOutService
+DemoViewModel *-- TapCounter
+CustomGestureStore --> CustomGesture
+CustomGesture --> CarCommand
+@enduml
+
+@startuml demo-watch-fall
+title 낙상 확인 흐름 (워치 → 폰 → 로봇카)
+actor 사용자
+participant "WatchOutService\n(워치)" as SVC
+participant "CarConnectionService\n(폰)" as PHONE
+participant "DemoCar\n(PC, demo/car.py)" as CAR
+
+사용자 -> SVC : 넘어짐 (또는 개발자 모드 낙상 테스트)
+SVC -> SVC : FallDetector (자유낙하 → 충격 → 정지)\n→ "괜찮으세요?" 팝업, FallAlertTimer 10초
+alt 10초 안에 "괜찮아요"
+    SVC -> SVC : 취소, 아무에게도 알리지 않음
+else 응답 없음
+    SVC -> PHONE : Data Layer /watchout/msg/fall
+    PHONE -> PHONE : 폰에도 "낙상 의심" 알림
+    PHONE -> CAR : MQTT fall {"event":"fall_suspected"}
+    CAR -> CAR : 다가가기 → 웹캠 사진 → 쓰러짐 확인
+    CAR -> CAR : 보호자 문자 / 119 시뮬레이션 (outbox)
+    CAR -> PHONE : fall/result {"confirmed":true}
+    PHONE -> SVC : /watchout/msg/fall_result → "보호자에게 알렸어요"
+end
+@enduml
